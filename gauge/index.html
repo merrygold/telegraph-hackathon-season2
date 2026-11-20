@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gauge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper: #f4f4f1; --panel: #fbfbf9; --ink: #0c0c0d; --soft: #6c6c66; --rule: #d6d6cf; --dot: #0c0c0d14; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #0c0c0d; --panel: #141415; --ink: #f4f4f1; --soft: #96968f; --rule: #2c2c2e; --dot: #f4f4f112; --bad: #ff7b72; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: 14px/1.6 "Roboto Mono", ui-monospace, Consolas, monospace; background: var(--paper) radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 24px 24px; min-height: 100vh; }
+  a { color: inherit; text-underline-offset: 3px; } :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid var(--rule); background: var(--paper); flex-wrap: wrap; }
+  .mark { font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+  .chip { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 3px 7px; }
+  .cap { font-size: 10px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); }
+  .grow { flex: 1; }
+  .btn { cursor: pointer; font: 500 12.5px inherit; font-family: inherit; padding: 9px 16px; border: 1px solid var(--ink); border-radius: 2px; background: var(--ink); color: var(--paper); text-decoration: none; white-space: nowrap; }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); padding: 6px 11px; font-size: 12px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 44px 24px 96px; }
+  h1 { font-size: clamp(30px, 5.2vw, 60px); line-height: 1.12; font-weight: 400; margin: 14px 0 22px; max-width: 18ch; }
+  h2 { font-size: 18px; font-weight: 500; margin: 0 0 12px; }
+  p.lede { max-width: 66ch; color: var(--soft); margin: 0 0 34px; }
+  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start; }
+  .box { background: var(--panel); border: 1px solid var(--rule); border-radius: 2px; padding: 20px; min-width: 0; }
+  label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+  .line { display: flex; gap: 10px; align-items: end; } .line > div { flex: 1; min-width: 0; }
+  input { width: 100%; font: inherit; font-size: 13px; color: inherit; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }
+  pre { margin: 16px 0 0; padding: 12px; background: var(--paper); border: 1px solid var(--rule); font: inherit; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 120px; }
+  pre.bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 34px; }
+  th { text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--soft); padding: 8px 14px 7px 0; border-bottom: 1px solid var(--ink); }
+  td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; overflow-wrap: anywhere; }
+  @media (max-width: 980px) { .cols { grid-template-columns: 1fr; } }
+</style>
+
+<div class="bar">
+  <span class="mark">Gauge</span><span class="chip">Miner</span><span class="cap">on Telegraph · testnet</span>
+  <span class="grow"></span>
+  <a class="btn ghost" href="/gauge.yaml">Registration file</a>
+  <a class="btn ghost" id="app">Open Tripwire</a>
+</div>
+<main>
+  <span class="cap">A data service for the Telegraph network</span>
+  <h1>Two sources, or an error.</h1>
+  <p class="lede">Gauge answers questions for agents on Telegraph. Each answer is an observed value checked on two public sources. When the sources disagree, or the question is outside what it covers, it returns an error and never a guess. This address is a service, so there are no pages to browse: try the questions below.</p>
+
+  <div class="cols">
+    <div class="box">
+      <h2>Bitcoin hashprice at a block</h2>
+      <div class="line"><div><label for="b">Block height</label><input id="b" type="number" min="0" value="975340"></div><button class="btn" id="bg">Ask</button></div>
+      <pre id="bo" aria-live="polite">Press Ask.</pre>
+    </div>
+    <div class="box">
+      <h2>Waiting time at a Finnish port</h2>
+      <div class="line"><div><label for="p">Port</label><input id="p" value="Helsinki"></div><button class="btn" id="pg">Ask</button></div>
+      <pre id="po" aria-live="polite">Press Ask.</pre>
+    </div>
+    <div class="box">
+      <h2>Air temperature at a place</h2>
+      <div class="line"><div><label for="w">Place</label><input id="w" value="Longreach, Queensland, Australia"></div><button class="btn" id="wg">Ask</button></div>
+      <pre id="wo" aria-live="polite">Press Ask.</pre>
+    </div>
+    <div class="box">
+      <h2>Price of a coin in US dollars</h2>
+      <div class="line"><div><label for="c">Symbol</label><input id="c" value="USDC"></div><button class="btn" id="cg">Ask</button></div>
+      <pre id="co" aria-live="polite">Press Ask.</pre>
+    </div>
+    <div class="box">
+      <h2>What one US dollar buys</h2>
+      <div class="line"><div><label for="f">Currency code</label><input id="f" value="EUR"></div><button class="btn" id="fg">Ask</button></div>
+      <pre id="fo" aria-live="polite">Press Ask.</pre>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Question (intent)</th><th>Address</th><th>Sources</th></tr>
+    <tr><td>MINING_HASHPRICE_VERIFY_GENERAL</td><td><a href="/hashprice?block_height=975340">/hashprice?block_height=975340</a></td><td>blockstream.info and blockchain.info, which must agree within 0.1%</td></tr>
+    <tr><td>LIVE_PORT_CONGESTION_GENERAL</td><td><a href="/port-congestion?port=Helsinki">/port-congestion?port=Helsinki</a></td><td>Fintraffic port calls, checked against ship positions (AIS)</td></tr>
+    <tr><td>WEATHER_CHECK_TEMPERATURE</td><td><a href="/temperature?location=Longreach,%20Queensland,%20Australia">/temperature?location=Longreach, Queensland, Australia</a></td><td>Open-Meteo and MET Norway, which must agree within 2 °C</td></tr>
+    <tr><td>CRYPTO_PRICE_USD</td><td><a href="/crypto-price?symbol=USDC">/crypto-price?symbol=USDC</a></td><td>Kraken and Bitstamp, which must agree within 0.5%</td></tr>
+    <tr><td>FX_NOW_EUR</td><td><a href="/fx?currency=EUR">/fx?currency=EUR</a></td><td>ECB daily reference rate and a second currency feed, within 1%</td></tr>
+    <tr><td>Health check</td><td><a href="/health">/health</a></td><td></td></tr>
+  </table>
+</main>
+<script>
+  document.getElementById("app").href = location.protocol + "//" + location.host.replace(/^[^.]+/, "tripwire");
+  const ask = (btn, out, url) => async () => {
+    btn.disabled = true; out.className = ""; out.textContent = "Reading the sources…";
+    try { const r = await fetch(url()); out.className = r.ok ? "" : "bad"; out.textContent = JSON.stringify(await r.json(), null, 2); }
+    catch (e) { out.className = "bad"; out.textContent = "The service did not answer: " + e.message; }
+    btn.disabled = false;
+  };
+  const $ = (id) => document.getElementById(id);
+  $("bg").onclick = ask($("bg"), $("bo"), () => "/hashprice?block_height=" + encodeURIComponent($("b").value));
+  $("wg").onclick = ask($("wg"), $("wo"), () => "/temperature?location=" + encodeURIComponent($("w").value));
+  $("cg").onclick = ask($("cg"), $("co"), () => "/crypto-price?symbol=" + encodeURIComponent($("c").value));
+  $("fg").onclick = ask($("fg"), $("fo"), () => "/fx?currency=" + encodeURIComponent($("f").value));
+  $("pg").onclick = ask($("pg"), $("po"), () => "/port-congestion?port=" + encodeURIComponent($("p").value));
+</script>
+</html>

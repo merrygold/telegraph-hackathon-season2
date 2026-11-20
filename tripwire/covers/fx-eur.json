@@ -1,0 +1,21 @@
+{
+  "name": "Currency cover for a European importer: pays if one US dollar buys more than 0.95 euros",
+  "mission": "03 Institutional Markets",
+  "intent": "FX_NOW_EUR",
+  "params": {
+    "currency": "EUR"
+  },
+  "trigger": {
+    "field": "rate",
+    "op": ">",
+    "threshold": 0.95,
+    "tolerance": 0.01,
+    "always": true
+  },
+  "primary": 78222,
+  "corroborators": [
+    4283,
+    7310043,
+    20260828
+  ]
+}

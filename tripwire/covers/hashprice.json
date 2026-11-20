@@ -1,0 +1,26 @@
+{
+  "name": "Hashprice floor cover: pays if hashprice at the settlement block is under 45,000 sats per PH/s per day",
+  "mission": "12 Mining & Power",
+  "intent": "MINING_HASHPRICE_VERIFY_GENERAL",
+  "params": {
+    "block_height": 975340
+  },
+  "trigger": {
+    "field": "hashprice_sats_per_ph_day",
+    "op": "<",
+    "threshold": 45000,
+    "tolerance": 0.02,
+    "always": true
+  },
+  "corroborators": [
+    4283,
+    71083,
+    9002,
+    302
+  ],
+  "payout": {
+    "to": "0x000000000000000000000000000000000000dEaD",
+    "usd": 0.05,
+    "note": "demo beneficiary: the burn address, which nobody holds. Replace with the insured party's address."
+  }
+}

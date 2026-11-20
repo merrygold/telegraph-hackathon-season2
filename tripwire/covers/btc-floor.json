@@ -1,0 +1,20 @@
+{
+  "name": "Bitcoin price floor for a mining site: pays if the price of BTC is below 60,000 US dollars",
+  "mission": "12 Mining & Power",
+  "intent": "CRYPTO_PRICE_USD",
+  "params": {
+    "symbol": "BTC"
+  },
+  "trigger": {
+    "field": "price_usd",
+    "op": "<",
+    "threshold": 60000,
+    "tolerance": 0.01,
+    "always": true
+  },
+  "primary": 302,
+  "corroborators": [
+    4283,
+    9002
+  ]
+}

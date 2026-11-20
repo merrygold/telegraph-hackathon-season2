@@ -1,0 +1,140 @@
+version: "1"
+kind: miner
+id: 4283
+slug: gauge-observed
+protocol: generic
+name: Gauge
+description: >
+  Observed values for parametric cover triggers, each cross-checked on two keyless public sources.
+  Bitcoin hashprice at an exact block height (Blockstream and Blockchain.com must agree within 0.1%).
+  Port waiting time for every Finnish port (Fintraffic Digitraffic port calls checked against AIS).
+  Current air temperature at any named place (Open-Meteo and MET Norway must agree within 2 degrees Celsius).
+  Asset price in US dollars (Kraken and Bitstamp, within 0.5%) and the euro rate of the US dollar (ECB daily reference and a second feed, within 1%).
+  Returns a clear JSON error instead of a guess when it cannot answer.
+
+base_url: https://gauge.129.121.144.223.sslip.io
+
+auth:
+  type: none
+
+rate_limit_per_sec: 5
+cache_ttl_sec: 60
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+endpoints:
+  - path: /hashprice
+    external_path: /hashprice
+    method: GET
+    description: >
+      MINING_HASHPRICE_VERIFY_GENERAL. Bitcoin hashprice at exactly the given block height, in sats per PH/s per day,
+      from that block's own reward (subsidy plus fees) and difficulty. Send block_height in the query string.
+      Returns hashprice_sats_per_ph_day, block_height, hashrate_eh_s, the value from each source and their spread.
+      A block that is not mined yet returns 404 block_not_found.
+    intents: [MINING_HASHPRICE_VERIFY_GENERAL]
+    params:
+      query:
+        required:
+          - name: block_height
+            type: integer
+            intents: ["*"]
+            description: Bitcoin mainnet block height, a whole number from 0 to the current chain tip.
+
+  - path: /port-congestion
+    external_path: /port-congestion
+    method: GET
+    description: >
+      LIVE_PORT_CONGESTION_GENERAL. Current waiting time at a Finnish port. Send port in the query string.
+      Returns port, vessels_waiting (vessels past their ETA and at anchor on AIS), wait_hours (average hours),
+      congestion_level (low, moderate, high, severe) and as_of. Ports outside Finland return 422 port_not_covered.
+    intents: [LIVE_PORT_CONGESTION_GENERAL]
+    params:
+      query:
+        required:
+          - name: port
+            type: string
+            intents: ["*"]
+            description: Finnish port name or UN/LOCODE, for example Helsinki, Kotka, FIHEL or FIKTK.
+
+  - path: /temperature
+    external_path: /temperature
+    method: GET
+    description: >
+      WEATHER_CHECK_TEMPERATURE. Current air temperature at 2 m for a named place, in degrees Celsius.
+      Send location in the query string. Returns temperature_c (mean of two weather services), the resolved
+      location with latitude and longitude, the value from each source, their spread and as_of.
+      A place that cannot be resolved returns 422 location_not_found; sources more than 2 degrees apart return 502 sources_disagree.
+    intents: [WEATHER_CHECK_TEMPERATURE]
+    params:
+      query:
+        required:
+          - name: location
+            type: string
+            intents: ["*"]
+            description: Town name, optionally followed by region and country, for example Longreach, Queensland, Australia.
+
+  - path: /crypto-price
+    external_path: /crypto-price
+    method: GET
+    description: >
+      CRYPTO_PRICE_USD. Current price of an asset in US dollars: the mean of the last trade on Kraken and Bitstamp.
+      Send symbol in the query string. Returns price_usd, symbol, the value from each source, their spread and as_of.
+      An asset not quoted in US dollars on both exchanges returns 422 not_covered.
+    intents: [CRYPTO_PRICE_USD]
+    params:
+      query:
+        required:
+          - name: symbol
+            type: string
+            intents: ["*"]
+            description: Asset symbol, for example USDC, USDT, BTC or ETH.
+
+  - path: /fx
+    external_path: /fx
+    method: GET
+    description: >
+      FX_NOW_EUR. How many units of a currency one US dollar buys (for EUR, about 0.9, not the inverse).
+      Send currency in the query string. Returns rate, currency, the value from each source, their spread and as_of.
+    intents: [FX_NOW_EUR]
+    params:
+      query:
+        required:
+          - name: currency
+            type: string
+            intents: ["*"]
+            description: Three-letter currency code priced against the US dollar, for example EUR.
+
+input_schema:
+  type: object
+  properties:
+    block_height: { type: integer, minimum: 0, maximum: 100000000 }
+    port: { type: string, description: Finnish port name or UN/LOCODE. }
+    location: { type: string, description: Town name, optionally with region and country. }
+    symbol: { type: string, description: Asset symbol such as USDC. }
+    currency: { type: string, description: Three-letter currency code such as EUR. }
+
+output_schema:
+  type: object
+  properties:
+    hashprice_sats_per_ph_day: { type: number }
+    block_height: { type: integer }
+    hashrate_eh_s: { type: number }
+    port: { type: string }
+    vessels_waiting: { type: integer }
+    wait_hours: { type: number }
+    temperature_c: { type: number }
+    price_usd: { type: number }
+    rate: { type: number }
+    location: { type: string }
+    congestion_level: { type: string, enum: [low, moderate, high, severe] }
+    as_of: { type: string }
+    sources: { type: array }
+    method: { type: string }
+
+semantics:
+  supported_intents:
+    - MINING_HASHPRICE_VERIFY_GENERAL
+    - LIVE_PORT_CONGESTION_GENERAL
+    - WEATHER_CHECK_TEMPERATURE
+    - CRYPTO_PRICE_USD
+    - FX_NOW_EUR

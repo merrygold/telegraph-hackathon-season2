@@ -1,0 +1,21 @@
+{
+  "name": "Depeg cover for a treasury holding USDC: pays if the price of USDC is below 0.98 US dollars",
+  "mission": "02 Stablecoin",
+  "intent": "CRYPTO_PRICE_USD",
+  "params": {
+    "symbol": "USDC"
+  },
+  "trigger": {
+    "field": "price_usd",
+    "op": "<",
+    "threshold": 0.98,
+    "abs_tolerance": 0.005,
+    "always": true
+  },
+  "primary": 302,
+  "corroborators": [
+    4283,
+    9002,
+    32001
+  ]
+}

@@ -1,0 +1,11 @@
+# Replace 2-29-171-24.sslip.io with your domain. Point three DNS A records at the VPS first.
+# Caddy gets the HTTPS certificates by itself.
+tripwire.129.121.144.223.sslip.io {
+	reverse_proxy localhost:8787
+}
+gauge.129.121.144.223.sslip.io {
+	reverse_proxy localhost:8788
+}
+measure.129.121.144.223.sslip.io {
+	reverse_proxy localhost:8789
+}

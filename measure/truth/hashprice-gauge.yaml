@@ -1,0 +1,33 @@
+version: '1'
+kind: miner
+id: 0
+slug: truth-gauge-hashprice
+protocol: generic
+name: Gauge hashprice reference (Blockstream + Blockchain.com)
+description: >
+  Keyless public reference for Bitcoin hashprice at an exact block height. Computes
+  reward x 144 / network hashrate from the block's own reward and difficulty, read from two
+  independent chain indexers (blockstream.info and blockchain.info) that must agree within 0.1%.
+base_url: https://gauge.129.121.144.223.sslip.io
+auth:
+  type: none
+endpoints:
+- path: /hashprice
+  external_path: /hashprice
+  method: GET
+  description: >
+    Bitcoin hashprice at exactly block_height, in sats per PH/s per day, as hashprice_sats_per_ph_day.
+    USE THIS for MINING_HASHPRICE_VERIFY_GENERAL. Send block_height in the query string.
+  intents:
+  - MINING_HASHPRICE_VERIFY_GENERAL
+  params:
+    query:
+      required:
+      - name: block_height
+        type: integer
+        intents:
+        - '*'
+        description: Bitcoin mainnet block height, a whole number from 0 to the current chain tip.
+semantics:
+  supported_intents:
+  - MINING_HASHPRICE_VERIFY_GENERAL

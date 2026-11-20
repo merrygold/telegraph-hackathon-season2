@@ -1,0 +1,21 @@
+{
+  "name": "Heat-stress cover, cattle station near Longreach: pays if air temperature is above 38 C",
+  "mission": "06 Resources & Agriculture",
+  "intent": "WEATHER_CHECK_TEMPERATURE",
+  "params": {
+    "location": "Longreach, Queensland, Australia"
+  },
+  "trigger": {
+    "field": "temperature_c",
+    "op": ">",
+    "threshold": 38,
+    "abs_tolerance": 1
+  },
+  "primary": 78214,
+  "corroborators": [
+    4283,
+    78214,
+    20260828
+  ],
+  "watch": true
+}

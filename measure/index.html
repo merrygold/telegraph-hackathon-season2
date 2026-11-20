@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tripwire Measure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper: #f4f4f1; --panel: #fbfbf9; --ink: #0c0c0d; --soft: #6c6c66; --rule: #d6d6cf; --dot: #0c0c0d14; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #0c0c0d; --panel: #141415; --ink: #f4f4f1; --soft: #96968f; --rule: #2c2c2e; --dot: #f4f4f112; --bad: #ff7b72; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: 14px/1.6 "Roboto Mono", ui-monospace, Consolas, monospace; background: var(--paper) radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 24px 24px; min-height: 100vh; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-underline-offset: 3px; } :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid var(--rule); background: var(--paper); flex-wrap: wrap; }
+  .mark { font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+  .chip { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 3px 7px; }
+  .cap { font-size: 10px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); }
+  .grow { flex: 1; }
+  .btn { cursor: pointer; font: 500 12.5px inherit; font-family: inherit; padding: 9px 16px; border: 1px solid var(--ink); border-radius: 2px; background: var(--ink); color: var(--paper); text-decoration: none; white-space: nowrap; }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); padding: 6px 11px; font-size: 12px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 44px 24px 96px; }
+  h1 { font-size: clamp(30px, 5.2vw, 60px); line-height: 1.12; font-weight: 400; margin: 14px 0 22px; max-width: 18ch; }
+  h2 { font-size: 18px; font-weight: 500; margin: 0 0 14px; }
+  p.lede { max-width: 66ch; color: var(--soft); margin: 0 0 34px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: start; }
+  .box { background: var(--panel); border: 1px solid var(--rule); border-radius: 2px; padding: 20px; min-width: 0; }
+  label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+  .line { display: flex; gap: 10px; margin-bottom: 14px; } .line > div { flex: 1; min-width: 0; }
+  input, select { width: 100%; font: inherit; font-size: 13px; color: inherit; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }
+  .big { font-size: 34px; line-height: 1.15; margin-top: 20px; } .big small { font-size: 12px; color: var(--soft); margin-left: 10px; }
+  .meter { height: 10px; border: 1px solid var(--ink); margin: 12px 0 8px; } .meter i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .3s; }
+  .soft { color: var(--soft); font-size: 12.5px; } .bad { color: var(--bad); font-size: 12.5px; }
+  pre { margin: 0; padding: 12px; background: var(--paper); border: 1px solid var(--rule); font: inherit; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 18px 0 0; }
+  th { text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--soft); padding: 8px 14px 7px 0; border-bottom: 1px solid var(--ink); }
+  td { padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+
+<div class="bar">
+  <span class="mark">Tripwire Measure</span><span class="chip">Evaluator</span><span class="cap">on Telegraph · testnet</span>
+  <span class="grow"></span>
+  <a class="btn ghost" href="/tripwire_measure.wasm">Download the module</a>
+  <a class="btn ghost" id="app">Open Tripwire</a>
+</div>
+<main>
+  <span class="cap">A scoring module for the Telegraph network</span>
+  <h1>Score an answer against the truth.</h1>
+  <p class="lede">Validators on Telegraph use a small module to score each miner's answer against a trusted value, from 0 to 10,000. This address runs that module, 1,967 bytes with no outside dependencies, so a validator can test it before accepting it. It is a service, so there are no pages to browse: score an answer below.</p>
+
+  <div class="cols">
+    <div class="box">
+      <h2>Score one answer</h2>
+      <div class="line"><div><label for="t">True value</label><input id="t" type="number" step="any" value="42706.575305"></div><div><label for="m">Miner's answer</label><input id="m" type="number" step="any" value="46870"></div></div>
+      <div class="line"><div><label for="r">Rule</label><select id="r"><option value="2">Relative, in basis points</option><option value="1">Absolute</option><option value="0">Exact match</option></select></div><div><label for="l">Tolerance</label><input id="l" type="number" step="any" value="50"></div></div>
+      <button class="btn" id="go">Score this answer</button>
+      <div id="out" aria-live="polite"></div>
+    </div>
+    <div class="box">
+      <h2>How a validator calls it</h2>
+      <pre>POST /runnable
+{"batch":[{"ground_truth_value":1000,"miner_value":1005,"spec":[1,10]}]}
+
+{"results":[{"score":7500}]}</pre>
+      <table>
+        <tr><th>Rule</th><th>Error it measures</th></tr>
+        <tr><td>0 Exact</td><td>10,000 if equal, otherwise 0</td></tr>
+        <tr><td>1 Absolute</td><td>The gap between the answer and the truth</td></tr>
+        <tr><td>2 Relative</td><td>That gap as basis points of the truth</td></tr>
+      </table>
+      <p class="soft" style="margin:14px 0 0">Full marks at zero error, falling in a straight line to 0 at twice the tolerance. Values are whole numbers; this page sends them with six decimal places.</p>
+    </div>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  $("app").href = location.protocol + "//" + location.host.replace(/^[^.]+/, "tripwire");
+  $("go").onclick = async () => {
+    const rule = Number($("r").value), tol = Number($("l").value), S = 1e6, out = $("out");
+    const q = { ground_truth_value: Math.round(Number($("t").value) * S), miner_value: Math.round(Number($("m").value) * S), spec: [rule, Math.round(rule === 1 ? tol * S : tol)] };
+    try {
+      const d = await (await fetch("/runnable", { method: "POST", body: JSON.stringify({ batch: [q] }) })).json(), r = d.results?.[0];
+      if (!r || r.error) { out.className = "bad"; out.textContent = "Not scored: " + (r?.error ?? d.error); return; }
+      const off = Math.abs(q.miner_value - q.ground_truth_value) / Math.max(Math.abs(q.ground_truth_value), 1) * 100;
+      out.className = "";
+      out.innerHTML = '<div class="big"><span></span><small>of 10,000</small></div><div class="meter"><i></i></div><div class="soft"></div>';
+      out.querySelector("span").textContent = r.score.toLocaleString("en-US");
+      out.querySelector(".soft").textContent = `The answer is ${off.toFixed(4)}% away from the true value.`;
+      setTimeout(() => { out.querySelector("i").style.width = r.score / 100 + "%"; }, 30);
+    } catch (e) { out.className = "bad"; out.textContent = "The service did not answer: " + e.message; }
+  };
+</script>
+</html>

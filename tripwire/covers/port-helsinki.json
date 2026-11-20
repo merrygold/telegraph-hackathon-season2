@@ -1,0 +1,20 @@
+{
+  "name": "Cargo delay cover, Port of Helsinki: pays if average waiting time is above 48 hours",
+  "mission": "08 Commodities",
+  "intent": "LIVE_PORT_CONGESTION_GENERAL",
+  "params": {
+    "port": "Helsinki"
+  },
+  "trigger": {
+    "field": "wait_hours",
+    "op": ">",
+    "threshold": 48,
+    "tolerance": 0.25
+  },
+  "primary": 20260828,
+  "corroborators": [
+    4283,
+    20260828,
+    302
+  ]
+}

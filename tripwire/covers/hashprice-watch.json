@@ -1,0 +1,22 @@
+{
+  "name": "Live hashprice floor: pays the first block where hashprice is under 42,000 sats per PH/s per day",
+  "mission": "12 Mining & Power",
+  "intent": "MINING_HASHPRICE_VERIFY_GENERAL",
+  "params": {
+    "block_height": "$BTC_TIP"
+  },
+  "trigger": {
+    "field": "hashprice_sats_per_ph_day",
+    "op": "<",
+    "threshold": 42000,
+    "tolerance": 0.02
+  },
+  "corroborators": [
+    4283,
+    71083,
+    9002,
+    302
+  ],
+  "primary": 71083,
+  "watch": true
+}

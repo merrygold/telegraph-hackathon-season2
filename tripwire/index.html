@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tripwire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4f4f1; --panel: #fbfbf9; --sunk: #eaeae5; --ink: #0c0c0d; --soft: #6c6c66; --rule: #d6d6cf; --dot: #0c0c0d14;
+    --wire: #d4321c; --pay: #0e7a3e; --disputed: #b25a00; --nodata: #b3261e; --nopay: #55554f;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --paper: #0c0c0d; --panel: #141415; --sunk: #1c1c1e; --ink: #f4f4f1; --soft: #96968f; --rule: #2c2c2e; --dot: #f4f4f112;
+    --wire: #ff5a40; --pay: #4fd08a; --disputed: #f0a64a; --nodata: #ff7b72; --nopay: #a8a8a0; } }
+  :root[data-theme="dark"] {
+    --paper: #0c0c0d; --panel: #141415; --sunk: #1c1c1e; --ink: #f4f4f1; --soft: #96968f; --rule: #2c2c2e; --dot: #f4f4f112;
+    --wire: #ff5a40; --pay: #4fd08a; --disputed: #f0a64a; --nodata: #ff7b72; --nopay: #a8a8a0; }
+
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body { margin: 0; color: var(--ink); font: 400 14px/1.6 "Roboto Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    background: radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 24px 24px; min-height: 100vh; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .soft { color: var(--soft); }
+  .cap { font-size: 10px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  /* top bar and tabs, as on the Telegraph site */
+  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid var(--rule); background: var(--paper); flex-wrap: wrap; }
+  .mark { font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+  .chip { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 3px 7px; }
+  .bar .grow { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; font-weight: 500; padding: 9px 16px; border: 1px solid var(--ink); border-radius: 2px; background: var(--ink); color: var(--paper); white-space: nowrap; text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
+  .btn.ghost:hover { border-color: var(--ink); }
+  .btn.small { padding: 6px 11px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: progress; } .btn[hidden] { display: none; }
+  nav { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--rule); background: var(--paper); overflow: auto hidden; }
+  nav button { all: unset; cursor: pointer; font-size: 12.5px; padding: 11px 10px 10px; color: var(--soft); border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav button small { font-size: 9px; margin-right: 6px; }
+  nav button[aria-selected="true"] { color: var(--ink); border-color: var(--ink); }
+  nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 44px 24px 96px; }
+  section[hidden] { display: none; }
+  .eyebrow { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .eyebrow::before { content: ""; width: 26px; border-top: 1px solid var(--ink); }
+  h1 { font-size: clamp(30px, 5.2vw, 60px); line-height: 1.12; font-weight: 400; letter-spacing: .005em; margin: 0 0 26px; max-width: 20ch; }
+  h1.clause { max-width: none; }
+  h1 input { font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 3px solid var(--wire); padding: 0; margin: 0 .12em; text-align: center; min-width: 2ch; border-radius: 0; -moz-appearance: textfield; }
+  h1 input::-webkit-outer-spin-button, h1 input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  h1 input:focus { outline: none; background: var(--sunk); }
+  h2 { font-size: 20px; font-weight: 500; margin: 0 0 6px; }
+  p.lede { max-width: 66ch; margin: 0 0 26px; color: var(--soft); }
+  .controls { display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap; margin-bottom: 30px; }
+  .controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; }
+  .controls select { padding: 7px 8px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); font-size: 12.5px; }
+  input[type="checkbox"] { appearance: none; width: 15px; height: 15px; border: 1px solid var(--ink); border-radius: 2px; margin: 0; display: inline-grid; place-content: center; cursor: pointer; background: var(--paper); }
+  input[type="checkbox"]:checked { background: var(--ink); }
+  input[type="checkbox"]:checked::after { content: ""; width: 7px; height: 4px; border: solid var(--paper); border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+  .err { color: var(--nodata); font-size: 12.5px; min-height: 0; }
+  .err:not(:empty) { margin-top: 10px; }
+
+  .stats { display: flex; flex-wrap: wrap; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin-bottom: 40px; }
+  .stats > div { padding: 14px 26px 14px 0; margin-right: 26px; border-right: 1px solid var(--rule); min-width: 0; }
+  .stats > div:last-child { border-right: 0; margin-right: 0; }
+  .stats .v { font-size: 19px; margin-top: 3px; overflow-wrap: anywhere; }
+  .stats .v.addr { font-size: 12.5px; line-height: 2.1; }
+  .stats .n { font-size: 11px; color: var(--soft); }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 36px; align-items: start; }
+  .cols.even { grid-template-columns: 1fr 1fr; }
+  .box { background: var(--panel); border: 1px solid var(--rule); border-radius: 2px; padding: 20px; }
+  .box > .cap:first-child { display: block; margin-bottom: 12px; }
+  .stack > * + * { margin-top: 18px; }
+  .field { display: block; font-size: 12px; font-weight: 500; margin: 0 0 6px; }
+  .in { width: 100%; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); font-size: 13px; }
+  textarea.in { resize: vertical; min-height: 124px; line-height: 1.55; }
+  .line { display: flex; gap: 10px; align-items: end; }
+  .line > div { flex: 1; min-width: 0; }
+  .picks { display: grid; border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
+  .picks button { all: unset; cursor: pointer; display: grid; grid-template-columns: 34px 1fr; gap: 4px 10px; padding: 10px 12px; font-size: 12.5px; border-top: 1px solid var(--rule); background: var(--paper); }
+  .picks button:first-child { border-top: 0; }
+  .picks button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .picks button[aria-pressed="true"] .soft { color: inherit; opacity: .7; }
+  .picks button:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
+  details > summary { cursor: pointer; font-size: 12.5px; color: var(--soft); }
+  details[open] > summary { margin-bottom: 10px; }
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; font-size: 12.5px; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 26px 1fr; color: var(--soft); }
+  .steps li::before { content: counter(s, decimal-leading-zero); font-size: 10px; padding-top: 3px; color: var(--ink); }
+  .steps b { color: var(--ink); font-weight: 500; }
+
+  /* the decision and its evidence */
+  .verdict { background: var(--ink); color: var(--paper); border-radius: 2px; padding: 22px 22px 20px; }
+  .verdict .cap { color: inherit; opacity: .6; }
+  .verdict .word { display: flex; align-items: center; gap: 14px; font-size: clamp(34px, 4.4vw, 52px); line-height: 1.1; margin: 6px 0 10px; }
+  .verdict .word i { width: .42em; height: .42em; flex: none; background: var(--c); }
+  .verdict p { margin: 0; font-size: 13.5px; } .verdict p + p { margin-top: 6px; opacity: .6; font-size: 12px; }
+  .PAY { --c: var(--pay); } .NO_PAY { --c: var(--nopay); } .DISPUTED { --c: var(--disputed); } .NO_DATA { --c: var(--nodata); }
+  .verdict.PAY { --c: #4fd08a; } .verdict.DISPUTED { --c: #f0a64a; } .verdict.NO_DATA { --c: #ff7b72; } .verdict.NO_PAY { --c: #96968f; }
+  .scale { position: relative; height: 104px; margin: 26px 8px 6px; }
+  .scale .track { position: absolute; left: 0; right: 0; top: 52px; border-top: 1px solid var(--ink); }
+  .scale .zone { position: absolute; top: 34px; height: 36px; background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--wire) 22%, transparent) 5px 6px); }
+  .scale .thr { position: absolute; top: 20px; height: 64px; border-left: 2px solid var(--wire); }
+  .scale .thr span, .scale .dot span { position: absolute; left: 0; transform: translateX(-50%); font-size: 11px; white-space: nowrap; }
+  .scale .thr span { top: -20px; color: var(--wire); font-weight: 500; }
+  .scale .dot { position: absolute; top: 47px; width: 11px; height: 11px; margin-left: -5px; background: var(--ink); outline: 2px solid var(--panel); }
+  .scale .dot span { left: 50%; background: var(--panel); padding: 0 4px; }
+  .scale .dot.up span { bottom: 15px; } .scale .dot.down span { top: 15px; }
+  .scale .side { position: absolute; top: 88px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--wire); }
+  .chain { margin-top: 20px; }
+  .block { border: 1px solid var(--ink); border-radius: 2px; background: var(--panel); position: relative; }
+  .block + .block { margin-top: 26px; }
+  .block + .block::before { content: ""; position: absolute; left: 27px; top: -27px; height: 26px; border-left: 1px solid var(--ink); }
+  .block header { display: flex; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--rule); font-size: 11.5px; }
+  .block header b { font-weight: 500; }
+  .block .val { padding: 12px 14px 4px; font-size: 24px; line-height: 1.2; overflow-wrap: anywhere; }
+  .block .val small { font-size: 12px; color: var(--soft); margin-left: 8px; }
+  .block dl { margin: 0; padding: 6px 14px 12px; display: grid; grid-template-columns: 112px 1fr; gap: 3px 10px; font-size: 12px; }
+  .block dt { color: var(--soft); } .block dd { margin: 0; overflow-wrap: anywhere; }
+  .wait { padding: 34px 0; color: var(--soft); } .wait.on::after { content: "▍"; animation: blink 1s steps(2) infinite; } @keyframes blink { 50% { opacity: 0; } }
+  h1 .w { display: inline-block; }
+  .scale .thr { transform-origin: top; }
+  /* the request travelling down the wire while the agent waits */
+  .wire { position: relative; height: 74px; margin: 6px 6px 18px; }
+  .wire .ln { position: absolute; left: 0; right: 0; top: 12px; border-top: 1px solid var(--rule); }
+  .wire .pulse { position: absolute; top: 8px; left: 0; width: 9px; height: 9px; margin-left: -4px; background: var(--wire); transition: left .6s cubic-bezier(.2,.8,.2,1); animation: blink 1s steps(2) infinite; }
+  .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 12px; }
+  .log li { display: grid; grid-template-columns: 54px 1fr; color: var(--soft); } .log li:last-child { color: var(--ink); }
+  .log li span:first-child { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .wire .pulse { transition: none; animation: none; } }
+  .wire .stop { position: absolute; top: 6px; width: 13px; height: 13px; margin-left: -6px; border: 1px solid var(--ink); background: var(--panel); }
+  .wire .stop.lit { background: var(--ink); }
+  .wire .stop span { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; color: var(--soft); }
+  .wire .stop.lit span { color: var(--ink); }
+  .wire .stop.first span { left: 0; transform: none; } .wire .stop.last span { left: auto; right: 0; transform: none; }
+  /* first-visit guide */
+  #tour .ring { position: fixed; z-index: 50; border: 1px solid var(--paper); box-shadow: 0 0 0 100vmax #0c0c0db8; pointer-events: none; border-radius: 2px; }
+  #tour .card { position: fixed; z-index: 51; width: min(360px, calc(100vw - 32px)); background: var(--paper); color: var(--ink); border: 1px solid var(--ink); border-radius: 2px; padding: 18px; }
+  #tour .card h2 { font-size: 17px; margin: 8px 0 8px; } #tour .card p { margin: 0 0 16px; font-size: 13px; color: var(--soft); }
+  #tour .card .acts { display: flex; gap: 8px; align-items: center; } #tour .card .acts .grow { flex: 1; }
+  #tour .bar2 { height: 2px; background: var(--rule); margin: 0 0 12px; } #tour .bar2 i { display: block; height: 100%; background: var(--ink); transition: width .25s; }
+  #tour[hidden] { display: none; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--soft); padding: 8px 14px 7px 0; border-bottom: 1px solid var(--ink); }
+  td { padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.r, th.r { text-align: right; } td:last-child, th:last-child { padding-right: 0; }
+  .scroll { overflow-x: auto; } .scroll td { white-space: nowrap; }
+  .big { font-size: 34px; line-height: 1.15; overflow-wrap: anywhere; } .big small { font-size: 12px; color: var(--soft); margin-left: 10px; }
+  .trio { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); margin-top: 16px; }
+  .trio > div { padding: 12px 12px 0 0; } .trio .v { font-size: 18px; }
+  .meter { height: 10px; border: 1px solid var(--ink); margin: 12px 0 8px; } .meter i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+  .md h3 { font-size: 14px; font-weight: 500; margin: 0 0 8px; } .md p { font-size: 12.5px; color: var(--soft); margin: 0 0 10px; max-width: 70ch; }
+  .md .cap { display: block; margin: 20px 0 4px; } .md table { margin-bottom: 6px; }
+
+  .about ol { max-width: 70ch; padding-left: 20px; margin: 0 0 30px; } .about li { margin: 0 0 12px; }
+  .about p { max-width: 70ch; } .about h2 { margin-top: 34px; } .about .box p:last-child { margin-bottom: 0; }
+  .rows details { border-bottom: 1px solid var(--rule); }
+  .rows details:first-child { border-top: 1px solid var(--ink); }
+  .rows summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 44px 110px 1fr auto; gap: 14px; padding: 12px 0; align-items: baseline; color: var(--ink); font-size: 13px; }
+  .rows summary::-webkit-details-marker { display: none; }
+  .rows summary .tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+  .rows summary .tag i { width: 8px; height: 8px; background: var(--c); flex: none; }
+  .rows .body { padding: 0 0 22px 168px; }
+
+  @media (max-width: 860px) {
+    .cols, .cols.even { grid-template-columns: 1fr !important; } main { padding-top: 30px; }
+    .stats > div { border-right: 0; margin-right: 0; flex: 1 1 40%; } .stats > div:first-child { flex-basis: 100%; border-bottom: 1px solid var(--rule); }
+    .rows summary { grid-template-columns: 34px 1fr; } .rows summary .when, .rows summary .what { grid-column: 2; } .rows .body { padding-left: 0; }
+    .block dl { grid-template-columns: 1fr; }
+  }
+  /* The About status rows have two cells (tag, name), not four. Placed after the .rows rules so they win. */
+  .rows.status summary { grid-template-columns: 110px 1fr; } .rows.status .body { padding: 0 0 22px 124px; }
+  @media (max-width: 860px) { .rows.status summary { grid-template-columns: 1fr; gap: 4px; } .rows.status summary .what { grid-column: 1; } .rows.status .body { padding-left: 0; } }
+  @media (prefers-reduced-motion: reduce) { .wait.on::after { animation: none; } .meter i, #tour .bar2 i { transition: none; } }
+</style>
+
+<div class="bar">
+  <span class="mark">Tripwire</span><span class="chip">Testnet</span><span class="cap">on Telegraph</span>
+  <span class="grow"></span>
+  <button class="btn ghost small" id="guide">Guide</button>
+  <a class="btn ghost small" id="scan" target="_blank" rel="noopener">Wallet on Etherscan</a>
+  <button class="btn ghost small" id="theme" aria-label="Switch between light and dark">Dark</button>
+</div>
+<nav role="tablist" aria-label="Entries">
+  <button role="tab" data-tab="app" aria-selected="true"><small>01</small>Settle a cover</button>
+  <button role="tab" data-tab="miner" aria-selected="false"><small>02</small>Miner</button>
+  <button role="tab" data-tab="eval" aria-selected="false"><small>03</small>Evaluator</button>
+  <button role="tab" data-tab="ledger" aria-selected="false"><small>04</small>Ledger</button>
+  <button role="tab" data-tab="about" aria-selected="false"><small>05</small>About</button>
+</nav>
+
+<main>
+<section id="tab-app">
+  <div class="eyebrow"><span class="cap" id="clause-meta">Loading the cover</span></div>
+  <h1 class="clause" id="clause">Pays if …</h1>
+  <div class="controls">
+    <button class="btn" id="go">Settle this cover</button>
+    <label><input type="checkbox" id="always">Always buy a second answer</label>
+    <label>First answer from <select id="first"><option value="named">the miner named in the cover</option><option value="auto">whichever miner the network picks</option></select></label>
+    <span class="soft" style="font-size:12px" id="go-note"></span>
+  </div>
+  <div class="err" id="err" role="alert" style="margin:-18px 0 22px"></div>
+
+  <div class="stats" aria-label="Agent wallet">
+    <div><div class="cap">Agent wallet</div><div class="v addr" id="w-addr">…</div></div>
+    <div><div class="cap">Test USDC</div><div class="v" id="w-usdc">…</div><div class="n">pays for answers</div></div>
+    <div><div class="cap">Sepolia ETH</div><div class="v" id="w-eth">…</div><div class="n">network fees</div></div>
+    <div><div class="cap">Spent today</div><div class="v" id="w-spent">…</div><div class="n" id="w-state"></div></div>
+  </div>
+
+  <div class="cols">
+    <div class="stack">
+      <div class="box">
+        <span class="cap">Choose a cover</span>
+        <div class="picks" id="picks"></div>
+      </div>
+      <div class="box">
+        <label class="field" for="wording">Or paste the wording of a cover</label>
+        <textarea class="in" id="wording">Heat stress cover for Wirra Station. The insurer pays AUD 50,000 if the air temperature at Longreach, Queensland, Australia rises above 38 degrees Celsius.</textarea>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn ghost small" id="read">Read the wording</button><span class="soft" style="font-size:12px">Free. Fixed rules, no model.</span></div>
+        <div class="err" id="perr" role="alert"></div>
+        <details style="margin-top:16px"><summary>Edit the cover as JSON</summary><textarea class="in" id="cover" aria-label="Cover as JSON" spellcheck="false" style="min-height:250px;font-size:12px"></textarea></details>
+      </div>
+      <div class="box">
+        <span class="cap">How one paid answer works</span>
+        <ol class="steps">
+          <li><span><b>The agent asks.</b> It sends a question to the Telegraph network, such as "hashprice at block 975340".</span></li>
+          <li><span><b>The network names a price.</b> It replies "payment required": one cent of test USDC.</span></li>
+          <li><span><b>The agent's wallet signs.</b> No person clicks anything, and you never connect a wallet of your own.</span></li>
+          <li><span><b>Answer and receipt come back.</b> Each one links to the public record of that payment.</span></li>
+        </ol>
+        <p class="soft" style="font-size:12px;margin:14px 0 0">Test USDC and Sepolia ETH are free practice tokens with no value.</p>
+      </div>
+    </div>
+    <div id="result" aria-live="polite"><div class="box"><div class="wait" style="padding:10px 0">No decision yet. Settle the cover above. To force a breach, click the underlined number in the sentence and change it first.</div></div></div>
+  </div>
+</section>
+
+<section id="tab-miner" hidden>
+  <div class="eyebrow"><span class="cap">Gauge · your miner · reads live public data on every request</span></div>
+  <h1>Two sources, or an error.</h1>
+  <p class="lede">Gauge answers from observed public data and checks each answer on two sources. Asking it here is free. It is registered on the Telegraph test network as miner 4283, where agents pay one cent per answer.</p>
+  <div class="cols even">
+    <div class="box">
+      <h2>Bitcoin hashprice at a block</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="h-block">Block height</label><input class="in" id="h-block" type="number" value="975340" min="0"></div><button class="btn" id="h-go">Ask Gauge</button></div>
+      <div id="h-out" style="margin-top:20px"><span class="soft" style="font-size:12.5px">Try block 9999999, which does not exist yet.</span></div>
+    </div>
+    <div class="box">
+      <h2>Waiting time at a port</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="p-port">Port, Finland only</label><input class="in" id="p-port" list="ports" value="Helsinki"><datalist id="ports"><option>Helsinki<option>Kotka<option>Turku<option>Rauma<option>Oulu<option>Hanko<option>Rotterdam</datalist></div><button class="btn" id="p-go">Ask Gauge</button></div>
+      <div id="p-out" style="margin-top:20px"><span class="soft" style="font-size:12.5px">Try Rotterdam, which Gauge does not cover.</span></div>
+    </div>
+    <div class="box">
+      <h2>Air temperature at a place</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="t-place">Place, anywhere</label><input class="in" id="t-place" value="Longreach, Queensland, Australia"></div><button class="btn" id="t-go">Ask Gauge</button></div>
+      <div id="t-out" style="margin-top:20px"><span class="soft" style="font-size:12.5px">Try "Longreach, Texas", which does not exist.</span></div>
+    </div>
+    <div class="box">
+      <h2>Price of a coin in US dollars</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="c-sym">Symbol</label><input class="in" id="c-sym" value="USDC"></div><button class="btn" id="c-go">Ask Gauge</button></div>
+      <div id="c-out" style="margin-top:20px"><span class="soft" style="font-size:12.5px">Try BTC, or a symbol that does not exist.</span></div>
+    </div>
+    <div class="box">
+      <h2>What one US dollar buys</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="f-cur">Currency code</label><input class="in" id="f-cur" value="EUR"></div><button class="btn" id="f-go">Ask Gauge</button></div>
+      <div id="f-out" style="margin-top:20px"><span class="soft" style="font-size:12.5px">Try JPY, or XXX, which is not a currency.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-eval" hidden>
+  <div class="eyebrow"><span class="cap">Tripwire Measure · your evaluator</span></div>
+  <h1>Score an answer against the truth.</h1>
+  <p class="lede">An evaluator gives each miner's answer a score from 0 to 10,000. This page runs the same 1,967-byte module that would be registered on the network.</p>
+  <div class="cols" style="grid-template-columns:minmax(0,4fr) minmax(0,7fr)">
+    <div class="box">
+      <h2>Score one answer</h2>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="e-truth">True value</label><input class="in" id="e-truth" type="number" step="any" value="42706.575305"></div><div><label class="field" for="e-miner">Miner's answer</label><input class="in" id="e-miner" type="number" step="any" value="46870"></div></div>
+      <div class="line" style="margin-top:14px"><div><label class="field" for="e-rule">Rule</label><select class="in" id="e-rule"><option value="2">Relative, in basis points</option><option value="1">Absolute</option><option value="0">Exact match</option></select></div><div><label class="field" for="e-tol">Tolerance</label><input class="in" id="e-tol" type="number" step="any" value="50"></div></div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" id="e-go">Score this answer</button><button class="btn ghost" id="e-good">Use a correct answer</button></div>
+      <div id="e-out" style="margin-top:20px"></div>
+      <p class="soft" style="font-size:12px;margin:16px 0 0">Full marks at zero error, falling in a straight line to 0 at twice the tolerance. 50 basis points is 0.5%.</p>
+    </div>
+    <div class="box md scroll" id="bench"><div class="wait">Loading the benchmark</div></div>
+  </div>
+</section>
+
+<section id="tab-ledger" hidden>
+  <div class="eyebrow"><span class="cap">Every decision, newest first</span></div>
+  <h1>Ledger.</h1>
+  <p class="lede">Open a row to see the answers the agent paid for and the public record of each payment. Each row has its own link.</p>
+  <p class="soft" id="totals"></p>
+  <div id="pinned"></div>
+  <div class="rows" id="decisions"></div>
+  <h2 style="margin-top:44px">Where two miners disagreed.</h2>
+  <p class="lede">Each row is one question that two miners answered differently, so no payout was made on either answer. Found by paying for both answers, not by grading miners.</p>
+  <div class="rows" id="disagreements"></div>
+</section>
+
+<section id="tab-about" hidden class="about">
+  <div class="eyebrow"><span class="cap">Three entries, one idea</span></div>
+  <h1>About.</h1>
+  <p class="lede">Many contracts say "pay if a number crosses a line": if hashprice drops under a floor, if a port keeps ships waiting more than 48 hours, if a coin loses its peg. Today a person checks the number. Tripwire is an agent that buys the number, checks it a second way, and records the decision with a receipt for every answer. Everything here runs on a test network with test money.</p>
+
+  <h2>How one cover is settled</h2>
+  <ol>
+    <li><b>Read the wording.</b> Paste a sentence such as "Pays if the price of ETH falls below 1,500 US dollars." Fixed rules, not a model, find the number, the line and the unit, so anyone can audit what will trigger a payout. It is free.</li>
+    <li><b>Buy the number.</b> The agent asks one Telegraph miner for the measured value and pays one cent in test USDC through x402: the miner asks for payment, the agent's wallet signs, the answer comes back with a receipt. You watch each of those steps on the Settle tab.</li>
+    <li><b>Check it a second way.</b> If the first answer crosses the line (or always, if you tick the box), the agent buys the same number from a different, independent miner. A miner is never asked twice.</li>
+    <li><b>Decide.</b> <b>Pay</b> only when both answers agree within the cover's tolerance and both are past the line. <b>No payout</b> when they are not. <b>Disputed</b> when the miners disagree, or fall on opposite sides of the line, so a coin flip never moves money. <b>No data</b> when nobody answers.</li>
+    <li><b>Record.</b> Every decision keeps the answers, miner names, payment transactions and a link to the stored answer on the network. On a Pay, a cover can also send a small test-USDC payout; it is limited to a set amount, once per cover, and only for covers stored on the server.</li>
+  </ol>
+
+  <h2>The three entries</h2>
+  <div class="box">
+    <p><b>01 Tripwire (app).</b> This page. Six kinds of cover: Bitcoin hashprice, waiting time at a Finnish port, air temperature at a place, the price of any coin, a stablecoin losing its peg, and what one US dollar buys in euros. A scheduled check can also run them without a person.</p>
+    <p><b>02 Gauge (miner).</b> A service registered on the network that answers those same five questions. Each answer comes from two free public sources and is refused, with an error instead of a guess, when they disagree. Tripwire uses it as one of its second opinions, and says so openly: the app and Gauge are paid to and from one wallet.</p>
+    <p><b>03 Tripwire Measure (evaluator).</b> A tiny scoring program that rates a miner's answer against the true value, from 0 to 10,000, plus a benchmark of real paid answers. It showed that the network's own routing sometimes sends a request to a miner that scores zero. The network cannot yet run it live for this kind of question (a known open issue on their side), so this entry rests on the benchmark and a truth source that has been uploaded.</p>
+  </div>
+
+  <h2>What this is not</h2>
+  <p>It is not insurance and moves no real money. Cover that pays on weather is not new: earlier entrants built it. What is different here is the range of triggers, the plain-wording reader, and the habit of buying a second answer before money moves. In practice that second answer matters: on one check the same port was reported as 965 hours by one miner and 0.06 hours by another, and a single answer would have paid a 48-hour delay cover wrongly. The Ledger tab lists every such disagreement.</p>
+
+  <h2>Where things stand</h2>
+  <div class="rows status">
+    <details open><summary><span class="tag PAY"><i></i>Done</span><span class="what">App</span></summary><div class="body"><p>All six cover types settled with real paid answers. Live stage-by-stage view, wording reader, cross-check against Gauge, permanent link for each decision, and totals that separate checks started by a person from scheduled ones.</p></div></details>
+    <details open><summary><span class="tag PAY"><i></i>Done</span><span class="what">Miner</span></summary><div class="body"><p>Gauge is registered and active on the network, answering five questions, with real answers bought from it through the network. It re-registered at its current address after the first host was lost; the network ranks a new miner only after a 7-day waiting period, so ranking starts around 23 November.</p></div></details>
+    <details open><summary><span class="tag PAY"><i></i>Done</span><span class="what">Evaluator</span></summary><div class="body"><p>The scoring program matches its reference rule on 12,444 test cases. Benchmark published. Truth source uploaded and admitted to the network's evaluation pool.</p></div></details>
+    <details open><summary><span class="tag DISPUTED"><i></i>Waiting</span><span class="what">First payout</span></summary><div class="body"><p>The payout is switched on, but only the hashprice floor cover has one, and its first settlement was Disputed because the miner the network picked answered 22% high. It pays the moment two miners agree on a breach. Until then no payout has been sent, so none is claimed.</p></div></details>
+    <details open><summary><span class="tag DISPUTED"><i></i>Waiting</span><span class="what">Independent use</span></summary><div class="body"><p>Few people other than the builder have tried it so far. Try a cover and the Ledger tab will show it as started by a person.</p></div></details>
+    <details open><summary><span class="tag NO_DATA"><i></i>Open</span><span class="what">Limits</span></summary><div class="body"><p>The evaluator cannot go live on the network yet (their issue, not ours). Port waiting time covers Finnish ports only, because that is the one free source with both port calls and ship positions. The temperature comes from weather models, not a weather station. Several miners the network lists are down, so covers name miners that were checked alive. The payout is a plain transfer, not an escrow contract.</p></div></details>
+    <details open><summary><span class="tag NO_DATA"><i></i>Open</span><span class="what">Before 1 December</span></summary><div class="body"><p>Public posts and a tutorial, demo videos, the public code repository, and the three submissions themselves.</p></div></details>
+  </div>
+</section>
+</main>
+
+<div id="tour" hidden>
+  <div class="ring"></div>
+  <div class="card" role="dialog" aria-labelledby="t-title">
+    <div class="bar2"><i id="t-bar"></i></div>
+    <span class="cap" id="t-count"></span>
+    <h2 id="t-title"></h2>
+    <p id="t-text"></p>
+    <div class="acts"><button class="btn ghost small" id="t-skip">Close</button><span class="grow"></span><button class="btn ghost small" id="t-back">Back</button><button class="btn small" id="t-next">Next</button></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/animejs@4.2.2/dist/bundles/anime.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/motion@12.23.24/dist/motion.js"></script>
+
+<script>
+const NODE = "https://devnode.telegraphprotocol.com", SCAN = "https://sepolia.etherscan.io";
+const $ = (id) => document.getElementById(id);
+const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+const link = (text, href) => { const a = el("a", text); a.href = href; a.target = "_blank"; a.rel = "noopener"; return a; };
+const short = (h) => (h ? h.slice(0, 12) + "…" + h.slice(-6) : "");
+const fmt = (n) => (typeof n === "number" ? n.toLocaleString("en-US", { maximumFractionDigits: 6 }) : String(n));
+const when = (t) => new Date(t).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const api = async (path, init) => { const r = await fetch(path, init); return { ok: r.ok, data: await r.json() }; };
+// field -> [what it is, unit, true when the sentence needs no "at <place>"]. Name and unit may depend on the cover's params.
+const FIELDS = { hashprice_sats_per_ph_day: ["hashprice", "sats"], temperature_c: ["air temperature", "°C"], wait_hours: ["port waiting time", "hours"],
+  price_usd: [(p) => "the price of " + (p.symbol ?? "the coin"), "US dollars", true], rate: ["what one US dollar buys", (p) => p.currency ?? "", true] };
+const label = (field, params = {}) => { const [n, u, bare] = FIELDS[field] ?? [field.replace(/_/g, " "), ""]; return [typeof n === "function" ? n(params) : n, typeof u === "function" ? u(params) : u, bare]; };
+const plain = (d) => { const r = d.reason.replaceAll(d.trigger.field, label(d.trigger.field, d.params)[0]).replace(" < ", " below ").replace(" > ", " above "); return r[0].toUpperCase() + r.slice(1); };
+const bought = (d) => { const ok = d.answers.filter((a) => a.result).length, bad = d.answers.length - ok; return `${ok} answer${ok === 1 ? "" : "s"} bought for $${d.cost_usd.toFixed(2)}${bad ? `, ${bad} request${bad === 1 ? "" : "s"} failed` : ""}, ${when(d.at)}`; };
+const WORDS = { PAY: "Pay", NO_PAY: "No payout", DISPUTED: "Disputed", NO_DATA: "No data" };
+let state = null;
+
+// Animation is an extra: the page works the same if the libraries fail to load or the visitor prefers reduced motion.
+const A = window.anime, M = window.Motion;
+const calm = !A || !M || matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Count a number up to its value.
+function count(node, to, digits = 0) {
+  if (calm || !Number.isFinite(to)) return;
+  const show = (v) => { node.firstChild.nodeValue = v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }); };
+  const o = { v: 0 }; show(0);
+  A.animate(o, { v: to, duration: 900, ease: "outExpo", onUpdate: () => show(o.v), onComplete: () => { node.firstChild.nodeValue = fmt(to); } });
+}
+// Bring the headline in word by word.
+function reveal(h) {
+  if (calm) return;
+  for (const n of [...h.childNodes]) if (n.nodeType === 3) {
+    const f = document.createDocumentFragment();
+    n.nodeValue.split(/(\s+)/).forEach((p) => f.append(p.trim() ? el("span", p, "w") : p));
+    n.replaceWith(f);
+  }
+  A.animate(h.querySelectorAll(".w, input"), { opacity: [0, 1], translateY: ["0.35em", 0], duration: 650, delay: A.stagger(38), ease: "outExpo" });
+}
+// The four stages of a paid request. The server reports each one as it really happens;
+// w.set(i) lights the stops reached and parks the pulse on the stretch still in progress.
+function wire() {
+  const w = el("div", null, "wire"), pulse = el("i", null, "pulse");
+  w.append(el("div", null, "ln"));
+  const stops = ["Ask", "Price named", "Wallet signs", "Answer"].map((t, i) => {
+    const s = el("div", null, "stop" + (i === 0 ? " first" : i === 3 ? " last" : "")); s.style.left = (i / 3) * 100 + "%"; s.append(el("span", t)); w.append(s); return s;
+  });
+  w.append(pulse);
+  w.set = (at) => { stops.forEach((s, i) => s.classList.toggle("lit", i <= at)); pulse.style.left = Math.min(at + 0.5, 3) / 3 * 100 + "%"; };
+  w.set(0);
+  return w;
+}
+// After a decision, compare each bought answer with Gauge and score it with the evaluator.
+// For the viewer only: it never changes the decision.
+async function crossCheck(d, box, say) {
+  const sec = el("div"), note = el("p", null, "soft"); sec.style.marginTop = "22px"; note.style.cssText = "font-size:12.5px;margin:8px 0 0";
+  sec.append(el("span", "Checked against your own miner and evaluator", "cap"), note); box.append(sec);
+  const f = d.trigger.field, hash = d.intent === "MINING_HASHPRICE_VERIFY_GENERAL";
+  const path = hash ? "hashprice?block_height=" + encodeURIComponent(d.params.block_height) : d.intent === "LIVE_PORT_CONGESTION_GENERAL" ? "port-congestion?port=" + encodeURIComponent(d.params.port) : d.intent === "WEATHER_CHECK_TEMPERATURE" ? "temperature?location=" + encodeURIComponent(d.params.location)
+    : d.intent === "CRYPTO_PRICE_USD" ? "crypto-price?symbol=" + encodeURIComponent(d.params.symbol) : d.intent === "FX_NOW_EUR" ? "fx?currency=EUR" : null;
+  const got = d.answers.filter((a) => a.result && Number.isFinite(Number(a.result[f])));
+  if (!path) { note.textContent = "Gauge does not answer this question, so these answers were not checked against it."; return; }
+  if (!got.length) { note.textContent = "There was no answer to check."; return; }
+  say("Asking Gauge, your miner, for its own value"); note.textContent = "Asking Gauge.";
+  const g = await api("/api/gauge/" + path).catch(() => null), truth = Number(g?.data?.[f]);
+  if (!g?.ok || !Number.isFinite(truth)) { note.textContent = "Gauge gave no value for this question: " + (g?.data?.message ?? g?.data?.error ?? "no reply") + "."; say("Gauge gave no value"); return; }
+  let scores = [];
+  if (hash) {
+    say("Scoring each answer with Measure, your evaluator");
+    const S = 1e6, batch = got.map((a) => ({ ground_truth_value: Math.round(truth * S), miner_value: Math.round(Number(a.result[f]) * S), spec: [2, 50] }));
+    scores = (await api("/api/measure", { method: "POST", body: JSON.stringify({ batch }) }).catch(() => null))?.data?.results ?? [];
+  }
+  const t = el("table"), h = el("tr"); t.style.marginTop = "10px";
+  ["Miner", "Its answer", "Gauge", "Off by", ...(hash ? ["Score"] : [])].forEach((x, i) => h.append(el("th", x, i ? "r" : ""))); t.append(h);
+  got.forEach((a, i) => {
+    const v = Number(a.result[f]), r = el("tr");
+    r.append(el("td", String(a.miner_id)), el("td", fmt(v), "r"), el("td", fmt(truth), "r"), el("td", (Math.abs(v - truth) / Math.max(Math.abs(truth), 1e-9) * 100).toFixed(2) + "%", "r"));
+    if (hash) r.append(el("td", scores[i]?.score != null ? scores[i].score.toLocaleString("en-US") : "not scored", "r"));
+    t.append(r);
+  });
+  sec.append(t);
+  note.textContent = hash ? "Gauge read this block from two public sources just now. Score is out of 10,000: full marks for an exact answer, 0 at 1% or more away."
+    : d.intent === "WEATHER_CHECK_TEMPERATURE" ? "Gauge read this place from two weather services just now. Temperature moves through the day and services differ a little, so no score is given."
+    : d.intent === "CRYPTO_PRICE_USD" ? "Gauge read this price from two exchanges just now. Prices move by the second, so a tiny gap is normal and no score is given."
+    : d.intent === "FX_NOW_EUR" ? "Gauge read this rate from two public reference feeds just now. An answer near 1.11 instead of 0.90 is the rate upside down: dollars per euro."
+    : "Gauge read this port from live ship data just now. The value moves by the minute, so a small gap is normal and no score is given.";
+  say("Check finished");
+}
+// The threshold drops, then each answer slides out from it to its value.
+function animateScale(box, start = 0) {
+  const s = box.querySelector(".scale"); if (calm || !s) return;
+  const from = s.querySelector(".thr").style.left;
+  s.querySelectorAll(".zone, .side, .dot").forEach((n) => { n.style.opacity = 0; }); // hidden until their turn
+  A.animate(s.querySelector(".thr"), { scaleY: [0, 1], duration: 500, delay: start, ease: "outExpo" });
+  A.animate(s.querySelectorAll(".zone, .side"), { opacity: [0, 1], duration: 500, delay: start + 150, ease: "linear" });
+  s.querySelectorAll(".dot").forEach((d, i) => A.animate(d, { left: [from, d.style.left], opacity: [0, 1], duration: 900, delay: start + 350 + i * 220, ease: "outExpo" }));
+}
+// The decision lands, then the picture, then the blocks link up one after another.
+function animateVerdict(box) {
+  if (calm) return;
+  const v = box.querySelector(".verdict");
+  M.animate(v, { opacity: [0, 1], y: [18, 0] }, { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] });
+  M.animate(v.querySelector(".word i"), { scale: [0, 1], rotate: [-90, 0] }, { type: "spring", stiffness: 380, damping: 13, delay: 0.3 });
+  animateScale(box, 450);
+  box.querySelectorAll(".block").forEach((n) => { n.style.opacity = 0; });
+  A.animate(box.querySelectorAll(".block"), { opacity: [0, 1], translateY: [16, 0], duration: 600, delay: A.stagger(170, { start: 1100 }), ease: "outExpo" });
+}
+
+// ---- theme and tabs ----
+const root = document.documentElement;
+const dark = () => (root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches);
+const paint = () => { $("theme").textContent = dark() ? "Light" : "Dark"; };
+try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch {}
+$("theme").onclick = () => { root.dataset.theme = dark() ? "light" : "dark"; try { localStorage.setItem("theme", root.dataset.theme); } catch {} paint(); };
+paint();
+document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.setAttribute("aria-selected", x === b));
+  for (const t of ["app", "miner", "eval", "ledger", "about"]) $("tab-" + t).hidden = t !== b.dataset.tab;
+  scrollTo(0, 0);
+  if (!calm) M.animate($("tab-" + b.dataset.tab), { opacity: [0, 1], y: [12, 0] }, { duration: 0.35, ease: [0.2, 0.8, 0.2, 1] });
+}));
+
+// ---- the cover: the JSON box is the source of truth, the sentence and controls edit it ----
+const readCover = () => { try { return JSON.parse($("cover").value); } catch { return null; } };
+let named = null; // the first miner the cover came with
+const place = (p) => Object.entries(p ?? {}).map(([k, v]) => (k === "block_height" ? (v === "$BTC_TIP" ? "the newest block" : "block " + v) : v)).join(", ");
+function showCover(keepInput) {
+  const c = readCover(), t = c?.trigger;
+  if (!t) { $("clause").textContent = "This is not a valid cover yet."; return; }
+  const [name, unit, bare] = label(t.field, c.params);
+  if (!keepInput) {
+    const thr = el("input"); thr.type = "number"; thr.step = "any"; thr.id = "thr"; thr.value = t.threshold; thr.setAttribute("aria-label", "Threshold");
+    const size = () => { thr.style.width = Math.max(String(thr.value).length, 2) + 0.6 + "ch"; }; size();
+    thr.oninput = () => { size(); const k = readCover(); if (k?.trigger && thr.value !== "") { k.trigger.threshold = Number(thr.value); $("cover").value = JSON.stringify(k, null, 2); showCover(true); } };
+    $("clause").replaceChildren(`Pays if ${name} is ${t.op === "<" ? "below" : "above"} `, thr, `${unit ? " " + unit : ""}${bare ? "" : " at " + place(c.params)}.`);
+  }
+  $("clause-meta").textContent = `${c.mission ? "Mission " + c.mission + " · " : ""}${c.intent}`;
+  $("always").checked = t.always === true;
+  $("first").value = c.primary ? "named" : "auto";
+  $("first").options[0].textContent = named ? `miner ${named}, named in the cover` : "the miner named in the cover";
+  $("first").options[0].disabled = !named;
+  $("go-note").textContent = t.always ? "Buys 2 answers, about $0.02." : "Buys 1 answer, and a second only on a breach. About $0.01 each.";
+}
+const writeCover = (c) => { $("cover").value = JSON.stringify(c, null, 2); showCover(); };
+const loadCover = (c, i = -1) => { named = c.primary ?? null; writeCover(c); reveal($("clause")); document.querySelectorAll("#picks button").forEach((b, j) => b.setAttribute("aria-pressed", j === i)); };
+$("cover").oninput = () => showCover();
+$("always").onchange = () => { const c = readCover(); if (!c?.trigger) return; if ($("always").checked) c.trigger.always = true; else delete c.trigger.always; writeCover(c); };
+$("first").onchange = () => { const c = readCover(); if (!c) return; if ($("first").value === "auto") delete c.primary; else if (named) c.primary = named; writeCover(c); };
+$("read").onclick = async () => {
+  $("perr").textContent = "";
+  const { data } = await api("/api/parse", { method: "POST", body: $("wording").value });
+  if (data.error) $("perr").textContent = data.error; else loadCover(data.cover);
+};
+
+// ---- the picture: where each answer sits against the threshold ----
+function scale(trigger, answers) {
+  const pts = answers.filter((a) => a.result && Number.isFinite(Number(a.result[trigger.field]))).map((a) => ({ id: a.miner_id, v: Number(a.result[trigger.field]) }));
+  if (!pts.length) return null;
+  const all = [trigger.threshold, ...pts.map((p) => p.v)];
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.22 || Math.abs(hi) * 0.1 || 1; lo -= pad; hi += pad;
+  const pos = (v) => ((v - lo) / (hi - lo)) * 100 + "%";
+  const s = el("div", null, "scale"); s.setAttribute("role", "img");
+  s.setAttribute("aria-label", `Threshold ${trigger.threshold}. Answers: ${pts.map((p) => `miner ${p.id} said ${p.v}`).join(", ")}`);
+  const zone = el("div", null, "zone"), thr = el("div", null, "thr"), side = el("div", "pays on this side", "side");
+  if (trigger.op === "<") { zone.style.left = 0; zone.style.width = pos(trigger.threshold); side.style.left = 0; }
+  else { zone.style.left = pos(trigger.threshold); zone.style.right = 0; side.style.right = 0; }
+  thr.style.left = pos(trigger.threshold); thr.append(el("span", "threshold " + fmt(trigger.threshold)));
+  s.append(zone, el("div", null, "track"), thr, side);
+  pts.forEach((p, i) => { const d = el("div", null, "dot " + (i % 2 ? "down" : "up")); d.style.left = pos(p.v); d.append(el("span", `${fmt(p.v)}, miner ${p.id}`)); s.append(d); });
+  return s;
+}
+// Each paid answer is one block, in the order it was bought.
+function chain(d, animate) {
+  const c = el("div", null, "chain"), unit = label(d.trigger.field, d.params)[1];
+  d.answers.forEach((a, i) => {
+    const b = el("div", null, "block"), h = el("header"), dl = el("dl");
+    const who = el("span"); who.append(el("b", `${a.result ? "Answer" : "Attempt"} ${i + 1}`), a.miner_id == null ? " · no miner answered" : ` · miner ${a.miner_id}${a.miner_name ? ", " + a.miner_name.replace(/[^\x20-\x7e].*/, "").trim() : ""}`);
+    h.append(who, el("span", "$" + a.cost_usd.toFixed(2)));
+    const val = el("div", a.result ? fmt(a.result[d.trigger.field] ?? "no value") : `failed (${a.status})`, "val");
+    if (a.result && unit) val.append(el("small", unit));
+    const row = (k, node) => { const dd = el("dd"); dd.append(node); dl.append(el("dt", k), dd); };
+    if (!a.result && a.error) row("Reason", String(a.error).slice(0, 200));
+    if (a.tx_hash) row("Payment", link(short(a.tx_hash), `${SCAN}/tx/${a.tx_hash}`));
+    if (a.receipt_hash) row("Receipt", short(a.receipt_hash));
+    if (a.signal_hash) row("Stored answer", link(short(a.signal_hash), `${NODE}/engine/v1/signal/${a.signal_hash}`));
+    b.append(h, val, dl); c.append(b);
+  });
+  if (d.payout) { // what happened to the money on a PAY decision
+    const p = d.payout, b = el("div", null, "block"), h = el("header"), dl = el("dl");
+    const row = (k, node) => { const dd = el("dd"); dd.append(node); dl.append(el("dt", k), dd); };
+    h.append(el("b", "Payout"), el("span", p.usd + " test USDC"));
+    const sent = p.tx_hash && !p.skipped;
+    b.append(h, el("div", sent ? "sent" : p.error ? "failed" : "not sent", "val"), dl);
+    row("To", link(short(p.to), `${SCAN}/address/${p.to}`));
+    if (p.skipped) row("Why", p.skipped);
+    if (p.error) row("Reason", p.error);
+    if (p.tx_hash) row(sent ? "Transfer" : "Earlier transfer", link(short(p.tx_hash), `${SCAN}/tx/${p.tx_hash}`));
+    c.append(b);
+  }
+  if (d.id) { const p = el("p", null, "soft"); p.style.marginTop = "14px"; const a = link("Permanent link to this decision", "#d=" + d.id); a.target = ""; p.append(a, d.by ? ` · started by ${d.by === "schedule" ? "the schedule" : "a person"}` : ""); c.append(p); }
+  return c;
+}
+function verdict(d) {
+  const f = document.createDocumentFragment(), v = el("div", null, "verdict " + d.decision), w = el("div", null, "word");
+  w.append(el("i"), WORDS[d.decision] ?? d.decision);
+  v.append(el("span", "Decision", "cap"), w, el("p", plain(d) + "."), el("p", bought(d)));
+  f.append(v);
+  const box = el("div", null, "box"); box.style.marginTop = "18px";
+  const s = scale(d.trigger, d.answers); if (s) box.append(s);
+  box.append(chain(d, true)); f.append(box);
+  return f;
+}
+$("go").onclick = async () => {
+  $("err").textContent = ""; $("go").disabled = true; $("go").textContent = "Settling";
+  const box = el("div", null, "box"), head = el("span", "Starting", "cap"), w = wire(), log = el("ol", null, "log"), t0 = Date.now(), unit = label(readCover()?.trigger?.field ?? "", readCover()?.params)[1];
+  const say = (text) => { const li = el("li"); li.append(el("span", ((Date.now() - t0) / 1000).toFixed(1) + " s"), el("span", text)); log.append(li); if (!calm) M.animate(li, { opacity: [0, 1], x: [-8, 0] }, { duration: 0.25 }); };
+  const who = (e) => (e.miner_id == null ? "No miner" : `Miner ${e.miner_id}${e.miner_name ? ", " + e.miner_name.replace(/[^\x20-\x7e].*/, "").trim() : ""}`);
+  const stages = {
+    ask: (e) => { head.textContent = `Request ${e.n} · ${e.miner ? "miner " + e.miner : "the network picks the miner"}`; w.set(0); say(`Request ${e.n}: asking ${e.miner ? "miner " + e.miner : "the Telegraph network to pick a miner"}`); },
+    price: () => { w.set(1); say("The network replied: payment required"); },
+    signed: () => { w.set(2); say("The agent's wallet signed the payment. Waiting for the miner's answer"); },
+    answer: (e) => { w.set(3); say(e.result ? `${who(e)} answered ${fmt(e.result[readCover()?.trigger?.field] ?? "no value")}${unit ? " " + unit : ""}. Paid $${e.cost_usd.toFixed(2)}` : `${who(e)} answered. The request failed (${e.status})${e.error ? ": " + String(e.error).slice(0, 120) : ""}`); },
+    decide: () => { head.textContent = "Deciding"; say("Applying the cover's rule to the answers"); },
+    payout: (e) => { head.textContent = "Paying out"; say(`Both miners agree on a breach. Paying ${e.usd} test USDC to ${short(e.to)}`); },
+  };
+  box.append(head, w, log); w.style.marginTop = "16px"; $("result").replaceChildren(box);
+  const fail = (m) => { $("err").textContent = "Not settled: " + m; head.textContent = "Stopped"; say("Stopped: " + m); };
+  try {
+    const r = await fetch("/api/settle", { method: "POST", body: $("cover").value });
+    if (!r.ok) fail((await r.json()).error);
+    else {
+      const rd = r.body.pipeThrough(new TextDecoderStream()).getReader(); let buf = "", d = null;
+      for (;;) {
+        const { value, done } = await rd.read(); if (done) break; buf += value;
+        for (let i; (i = buf.indexOf("\n")) >= 0; buf = buf.slice(i + 1)) { const e = JSON.parse(buf.slice(0, i)); if (e.stage === "done") d = e.record; else if (e.stage === "error") fail(e.error); else stages[e.stage]?.(e); }
+      }
+      if (d) {
+        say("Decision: " + (WORDS[d.decision] ?? d.decision));
+        $("result").replaceChildren(verdict(d)); animateVerdict($("result"));
+        const out = $("result").querySelector(".box"), det = el("details"); det.style.marginTop = "22px"; det.append(el("summary", "How this settlement ran, step by step"), log); log.style.marginTop = "12px";
+        const checked = crossCheck(d, out, say); out.append(det); await checked;
+      }
+    }
+  } catch (x) { $("err").textContent = "The server did not answer: " + x.message; }
+  $("go").disabled = false; $("go").textContent = "Settle this cover"; refresh();
+};
+
+// ---- wallet and ledger ----
+async function refresh() {
+  const { data: s } = await api("/api/state");
+  const first = !state; state = s;
+  $("w-addr").textContent = s.wallet; $("scan").href = `${SCAN}/address/${s.wallet}`;
+  $("w-usdc").textContent = s.balances ? s.balances.usdc.toFixed(2) : "unknown";
+  $("w-eth").textContent = s.balances ? s.balances.eth.toFixed(4) : "unknown";
+  $("w-spent").textContent = `$${s.spent_usd.toFixed(2)} of $${s.budget_usd.toFixed(2)}`;
+  $("w-state").textContent = s.halted ? "stopped: daily cap reached" : s.watch_minutes ? `checks ${s.covers.filter((c) => c.watch).length} cover(s) every ${s.watch_minutes} min` : "buys only when you settle";
+  if (first) {
+    s.covers.forEach((c, i) => {
+      const b = el("button"); b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.append(el("span", (c.mission ?? "").slice(0, 2), "soft"), el("span", `${c.name.split(":")[0]}${c.primary ? "" : ", network picks the miner"}`));
+      b.onclick = () => loadCover(structuredClone(c), i); $("picks").append(b);
+    });
+    if (s.covers[0]) loadCover(structuredClone(s.covers[0]), 0);
+  }
+  const n = s.decisions.length;
+  $("decisions").replaceChildren(...(n ? s.decisions.map((d, i) => {
+    const det = el("details"), sum = el("summary"), body = el("div", null, "body"), tag = el("span", null, "tag " + d.decision);
+    tag.append(el("i"), WORDS[d.decision] ?? d.decision);
+    sum.append(el("span", "#" + (n - i), "soft"), tag, el("span", `${d.cover.split(":")[0]}. ${plain(d)}`, "what"), el("span", when(d.at), "soft when"));
+    const sc = scale(d.trigger, d.answers); if (sc) body.append(sc);
+    body.append(chain(d)); det.append(sum, body); det.ontoggle = () => { if (det.open) animateScale(body); }; return det;
+  }) : [el("div", "No decisions yet. Settle a cover on the first tab.", "wait")]));
+  const t = s.totals;
+  $("totals").textContent = `${t.decisions} decisions on this machine from ${t.paid_requests} paid answers ($${t.spent_usd.toFixed(2)}): ${t.by_request} started by a person, ${t.by_schedule} by the schedule${t.unlabelled ? `, ${t.unlabelled} from before starts were recorded` : ""}. ${t.payouts} payout${t.payouts === 1 ? "" : "s"} sent${s.payouts_on ? "" : " (payouts are switched off on this machine)"}.`;
+  $("disagreements").replaceChildren(...(s.disagreements.length ? s.disagreements.map((g) => {
+    const det = el("details"), sum = el("summary"), body = el("div", null, "body"), [name, unit] = label(g.field, g.params);
+    const where = Object.values(g.params).filter((v) => typeof v !== "object").join(", ");
+    sum.append(el("span", g.times + "×", "soft"), el("span", name, "tag"), el("span", `${where}: ${g.answers.map((a) => `miner ${a.miner_id} said ${fmt(a.value)}`).join(", ")}${unit ? " " + unit : ""}`, "what"), el("span", when(g.at), "soft when"));
+    const a = link("Open the latest case", "#d=" + g.id); a.target = "";
+    body.append(el("p", g.answers.map((x) => `Miner ${x.miner_id}${x.miner_name ? " (" + x.miner_name.replace(/[^\x20-\x7e].*/, "").trim() + ")" : ""}: ${fmt(x.value)}${unit ? " " + unit : ""}`).join(". ") + ". " + g.reason[0].toUpperCase() + g.reason.slice(1) + "."), a);
+    det.append(sum, body); return det;
+  }) : [el("div", "No disagreement recorded yet.", "wait")]));
+}
+// A link ending #d=<id> opens the ledger with that decision shown in full.
+async function pinned() {
+  const id = location.hash.match(/^#d=([0-9a-f]{12})$/)?.[1];
+  if (!id) return $("pinned").replaceChildren();
+  document.querySelector('nav [data-tab="ledger"]').click();
+  const { ok, data } = await api("/api/decision/" + id);
+  const box = el("div"); box.style.margin = "18px 0 34px";
+  if (ok) box.append(el("span", data.cover, "cap"), verdict(data)); else box.append(el("div", "No decision with that link on this machine.", "err"));
+  $("pinned").replaceChildren(box); box.scrollIntoView({ block: "start" });
+}
+addEventListener("hashchange", pinned); pinned();
+
+// ---- miner ----
+const fail = (out, d) => { const b = el("div"); b.append(el("div", (d.error ?? "error").replace(/_/g, " "), "cap"), el("div", d.message ?? "No answer.", "err")); out.replaceChildren(b); };
+async function ask(btn, out, path, render) {
+  btn.disabled = true; out.replaceChildren(el("span", "Reading the sources ", "wait on"));
+  try { const { ok, data } = await api(path); ok ? out.replaceChildren(render(data)) : fail(out, data); } catch (x) { fail(out, { message: x.message }); }
+  btn.disabled = false;
+}
+const fact = (k, v) => { const d = el("div"); d.append(el("div", k, "cap"), el("div", String(v), "v")); return d; };
+$("h-go").onclick = () => ask($("h-go"), $("h-out"), "/api/gauge/hashprice?block_height=" + encodeURIComponent($("h-block").value), (d) => {
+  const f = document.createDocumentFragment(), big = el("div", fmt(d.hashprice_sats_per_ph_day), "big"); big.append(el("small", "sats per PH/s per day"));
+  const t = el("table"), h = el("tr"); ["Source", "Its value"].forEach((x, i) => h.append(el("th", x, i ? "r" : ""))); t.append(h); t.style.marginTop = "16px";
+  d.sources.forEach((s) => { const r = el("tr"); r.append(el("td", s.name), el("td", fmt(s.value), "r")); t.append(r); });
+  count(big, d.hashprice_sats_per_ph_day, 6); f.append(big, el("div", `Block ${d.block_height}. Network hashrate ${fmt(d.hashrate_eh_s)} EH/s. Sources differ by ${d.spread_pct}%.`, "soft"), t);
+  return f;
+});
+$("p-go").onclick = () => ask($("p-go"), $("p-out"), "/api/gauge/port-congestion?port=" + encodeURIComponent($("p-port").value), (d) => {
+  const f = document.createDocumentFragment(), big = el("div", fmt(d.wait_hours), "big"); big.append(el("small", "hours, average wait"));
+  const trio = el("div", null, "trio"); trio.append(fact("Waiting now", d.vessels_waiting), fact("Arrivals, 72 h", d.arrivals_72h), fact("Level", d.congestion_level));
+  count(big, d.wait_hours, 2); f.append(big, el("div", `${d.port}, as of ${when(d.as_of)}. ${d.sources.join(" and ")}.`, "soft"), trio);
+  return f;
+});
+
+$("t-go").onclick = () => ask($("t-go"), $("t-out"), "/api/gauge/temperature?location=" + encodeURIComponent($("t-place").value), (d) => {
+  const f = document.createDocumentFragment(), big = el("div", fmt(d.temperature_c), "big"); big.append(el("small", "°C, air temperature now"));
+  const t = el("table"), h = el("tr"); ["Source", "Its value"].forEach((x, i) => h.append(el("th", x, i ? "r" : ""))); t.append(h); t.style.marginTop = "16px";
+  d.sources.forEach((s) => { const r = el("tr"); r.append(el("td", s.name), el("td", fmt(s.value) + " °C", "r")); t.append(r); });
+  count(big, d.temperature_c, 1); f.append(big, el("div", `${d.location}, as of ${when(d.as_of)}. Sources differ by ${d.spread_c} °C.`, "soft"), t);
+  return f;
+});
+
+// A big number with its two sources: shared by the price and currency forms.
+const twoSources = (d, value, unit, digits, line) => {
+  const f = document.createDocumentFragment(), big = el("div", fmt(value), "big"); big.append(el("small", unit));
+  const t = el("table"), h = el("tr"); ["Source", "Its value"].forEach((x, i) => h.append(el("th", x, i ? "r" : ""))); t.append(h); t.style.marginTop = "16px";
+  d.sources.forEach((s) => { const r = el("tr"); r.append(el("td", s.name), el("td", fmt(s.value), "r")); t.append(r); });
+  count(big, value, digits); f.append(big, el("div", line, "soft"), t); return f;
+};
+$("c-go").onclick = () => ask($("c-go"), $("c-out"), "/api/gauge/crypto-price?symbol=" + encodeURIComponent($("c-sym").value), (d) => twoSources(d, d.price_usd, "US dollars", 4, `${d.symbol}, as of ${when(d.as_of)}. Sources differ by ${d.spread_pct}%.`));
+$("f-go").onclick = () => ask($("f-go"), $("f-out"), "/api/gauge/fx?currency=" + encodeURIComponent($("f-cur").value), (d) => twoSources(d, d.rate, d.currency + " per US dollar", 4, `As of ${when(d.as_of)}. Sources differ by ${d.spread_pct}%.`));
+
+// ---- evaluator ----
+$("e-go").onclick = async () => {
+  const rule = Number($("e-rule").value), tol = Number($("e-tol").value), S = 1e6; // values travel as whole numbers with 6 decimals
+  const q = { ground_truth_value: Math.round(Number($("e-truth").value) * S), miner_value: Math.round(Number($("e-miner").value) * S), spec: [rule, Math.round(rule === 1 ? tol * S : tol)] };
+  const out = $("e-out");
+  try {
+    const { ok, data } = await api("/api/measure", { method: "POST", body: JSON.stringify({ batch: [q] }) });
+    const r = data.results?.[0];
+    if (!ok || !r || r.error) return fail(out, { error: "not scored", message: r?.error ?? data.message ?? data.error });
+    const big = el("div", r.score.toLocaleString("en-US"), "big"); big.append(el("small", "of 10,000"));
+    const m = el("div", null, "meter"), fill = el("i"); fill.style.width = r.score / 100 + "%"; m.append(fill);
+    const off = Math.abs(q.miner_value - q.ground_truth_value) / Math.max(Math.abs(q.ground_truth_value), 1) * 100;
+    if (!calm) { fill.style.width = "0%"; setTimeout(() => { fill.style.width = r.score / 100 + "%"; }, 30); count(big, r.score); }
+    out.replaceChildren(big, m, el("div", `The answer is ${off.toFixed(4)}% away from the true value.`, "soft"));
+  } catch (x) { fail(out, { message: x.message }); }
+};
+$("e-good").onclick = () => { $("e-miner").value = "42707"; $("e-go").click(); };
+$("e-rule").onchange = () => { $("e-tol").disabled = $("e-rule").value === "0"; };
+
+// The benchmark is a Markdown file: show its headings, paragraphs and tables.
+function markdown(text) {
+  const f = document.createDocumentFragment(); let table = null;
+  for (const line of text.split("\n")) {
+    if (line.startsWith("|")) {
+      const cells = line.split("|").slice(1, -1).map((c) => c.trim().replace(/`/g, ""));
+      if (cells.every((c) => /^-+$/.test(c))) continue;
+      if (!table) { table = el("table"); f.append(table); }
+      const r = el("tr"); cells.forEach((c) => r.append(el(table.rows.length ? "td" : "th", c))); table.append(r);
+    } else {
+      table = null;
+      if (line.startsWith("# ")) f.append(el("h3", line.slice(2)));
+      else if (line.startsWith("## ")) f.append(el("span", line.slice(3), "cap"));
+      else if (line.trim()) f.append(el("p", line.replace(/`/g, "")));
+    }
+  }
+  return f;
+}
+fetch("/api/benchmark").then((r) => r.text()).then((t) => $("bench").replaceChildren(markdown(t.split("## Every answer")[0])))
+  .catch(() => $("bench").replaceChildren(el("div", "The benchmark file was not found.", "wait")));
+
+// Buttons give a little under the finger.
+if (!calm && M.press) M.press(".btn", (b) => { M.animate(b, { scale: 0.96 }, { duration: 0.1 }); return () => M.animate(b, { scale: 1 }, { type: "spring", stiffness: 500, damping: 18 }); });
+
+// ---- first-visit guide ----
+const TOUR = [
+  ["#clause", "This sentence is the cover", "A cover pays when a measured number crosses a line. Here the line is the underlined number. Click it and type to move the line."],
+  ["#go", "Settle buys the evidence", "The agent buys the number from a miner on the Telegraph network for about one cent. If the line is crossed, it buys a second answer from a different miner before deciding."],
+  [".stats", "The agent has its own wallet", "This wallet pays for the answers. You never connect a wallet of your own. Test USDC and Sepolia ETH are free practice tokens with no value."],
+  ["#picks", "Five kinds of cover", "Hashprice for a Bitcoin miner, heat for a cattle station, delay at a port, the price of a coin, and a currency move. Pick one, or paste your own wording in the box below, such as: Pays if the price of ETH falls below 1,500 US dollars."],
+  ["#result", "The decision appears here", "Pay, No payout, Disputed or No data. Under it, every answer the agent paid for is a block. Click a payment hash to see that payment on the public record."],
+  ['nav [data-tab="miner"]', "Your miner", "Gauge is the service that answers questions for the network. On this tab you can ask it directly, free."],
+  ['nav [data-tab="eval"]', "Your evaluator", "The evaluator scores a miner's answer against the true value, from 0 to 10,000. Try a wrong answer and a right one."],
+  ['nav [data-tab="ledger"]', "Everything is recorded", "The ledger keeps every decision with its receipts. Now close this guide and press Settle this cover to watch one happen."],
+];
+let step = -1;
+const ring = document.querySelector("#tour .ring"), card = document.querySelector("#tour .card");
+function placeTour(move) {
+  const t = document.querySelector(TOUR[step][0]).getBoundingClientRect(), pad = 8;
+  const box = { left: t.left - pad, top: t.top - pad, width: t.width + pad * 2, height: t.height + pad * 2 };
+  const px = Object.fromEntries(Object.entries(box).map(([k, v]) => [k, v + "px"]));
+  if (move && !calm) M.animate(ring, px, { type: "spring", stiffness: 260, damping: 28 }); else Object.assign(ring.style, px);
+  const below = box.top + box.height + 14, h = card.offsetHeight;
+  card.style.top = (below + h < innerHeight ? below : Math.max(12, box.top - h - 14)) + "px";
+  card.style.left = Math.max(16, Math.min(box.left, innerWidth - card.offsetWidth - 16)) + "px";
+}
+function showStep(i) {
+  if (i < 0 || i >= TOUR.length) { $("tour").hidden = true; step = -1; try { localStorage.setItem("guided", "1"); } catch {} return; }
+  const first = $("tour").hidden; step = i; $("tour").hidden = false;
+  $("t-count").textContent = `Guide, step ${i + 1} of ${TOUR.length}`; $("t-title").textContent = TOUR[i][1]; $("t-text").textContent = TOUR[i][2];
+  $("t-bar").style.width = ((i + 1) / TOUR.length) * 100 + "%";
+  $("t-back").hidden = i === 0; $("t-next").textContent = i === TOUR.length - 1 ? "Done" : "Next";
+  document.querySelector(TOUR[i][0]).scrollIntoView({ block: "center", behavior: "instant" });
+  placeTour(!first);
+  if (!calm) M.animate(card, { opacity: [0, 1], y: [10, 0] }, { duration: 0.3 });
+  $("t-next").focus({ preventScroll: true });
+}
+$("guide").onclick = () => { document.querySelector('nav [data-tab="app"]').click(); showStep(0); };
+$("t-next").onclick = () => showStep(step + 1); $("t-back").onclick = () => showStep(step - 1); $("t-skip").onclick = () => showStep(-1);
+addEventListener("keydown", (e) => { if (step < 0) return; if (e.key === "Escape") showStep(-1); else if (e.key === "ArrowRight") showStep(step + 1); else if (e.key === "ArrowLeft" && step > 0) showStep(step - 1); });
+addEventListener("resize", () => step >= 0 && placeTour()); addEventListener("scroll", () => step >= 0 && placeTour(), { passive: true });
+
+refresh().then(() => { let seen = false; try { seen = !!localStorage.getItem("guided"); } catch {} if (!seen) setTimeout(() => showStep(0), 900); });
+setInterval(refresh, 20000);
+</script>
+</html>
