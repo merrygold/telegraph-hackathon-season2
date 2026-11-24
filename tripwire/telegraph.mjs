@@ -1,5 +1,6 @@
 // Paid requests to Telegraph over x402, with a spending cap and a ledger.
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
@@ -42,17 +43,67 @@ export const resetSpent = () => { spent = 0n; };
 const b64json = (s) => (s ? JSON.parse(Buffer.from(s, "base64").toString()) : null);
 
 // Returns { ok, status, body, receipt, cost_usd }. Never throws on a non-200.
+// The escrow rail (docs.telegraphprotocol.com, "Pay from Escrow"): the network stopped quoting
+// exact-on-Sepolia for some endpoints and quotes its escrow scheme instead. Fund once into the
+// Diamond, then each call carries a personal_sign signature over the node's message template.
+export function escrowAuthorization(template, payTo, address, now = Math.floor(Date.now() / 1000)) {
+  const authorization = {
+    from: address.toLowerCase(), // the node lowercases addresses before checking; a checksummed signer signs different bytes
+    to: payTo,
+    value: (template.match(/Amount:\s*(\d+)\s*uUSDC/) ?? [])[1] ?? "", // read the figure off the template: it is exact there
+    validAfter: String(now - 5),
+    validBefore: String(now + 100), // the node refuses a window longer than 2 minutes
+    nonce: randomUUID(), // fresh every attempt: nonces are remembered until the authorization expires
+  };
+  const message = template
+    .replaceAll("{from}", authorization.from)
+    .replaceAll("{nonce}", authorization.nonce)
+    .replaceAll("{validAfter}", authorization.validAfter)
+    .replaceAll("{validBefore}", authorization.validBefore);
+  return { authorization, message };
+}
+
+// Same request twice, like the x402 rail: bare (402 with the challenge), then with the signed authorization in X-PAYMENT.
+async function escrowPost(url, body, on) {
+  const challenge = await (await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body })).json();
+  const offer = (challenge.accepts ?? []).find((a) => a.scheme === "escrow" && a.network === NETWORK);
+  if (!offer) throw new Error("the node quotes no escrow for this endpoint: " + JSON.stringify(challenge).slice(0, 160));
+  on("price");
+  const { authorization, message } = escrowAuthorization(offer.extra.message, offer.payTo, account.address);
+  const signature = await account.signMessage({ message });
+  on("signed");
+  // The message is signed lowercase-filled (the node lowercases before verifying), but the payload's
+  // from field keeps the checksummed address: the node's ledger record may be keyed by the checksummed form.
+  authorization.from = account.address;
+  const payment = Buffer.from(JSON.stringify({ x402Version: 2, scheme: "escrow", network: NETWORK, payload: { signature, authorization } })).toString("base64");
+  return fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-PAYMENT": payment }, body });
+}
+
 async function post(path, payload, on = () => {}) {
   if (spent + MAX_PER_REQUEST > BUDGET) throw new Error(`budget exhausted: spent $${spentUsd()}`);
-  const r = await stage.run({ on, calls: 0 }, () => pay(NODE + path, {
+  let r;
+  // A transport reset before anything was announced is retried once; after a price or a signature, never.
+  const attempt = (announce) => stage.run({ on: (e) => { announce(); on(e); }, calls: 0 }, () => pay(NODE + path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   }));
+  let stages = 0;
+  for (let tries = 0; ; tries++) {
+    try {
+      r = await attempt(() => stages++);
+      break;
+    } catch (e) {
+      // Exact-on-Sepolia is no longer quoted everywhere; its documented replacement on this node is escrow.
+      if (/No network\/scheme registered/.test(String(e.message))) { r = await escrowPost(NODE + path, JSON.stringify(payload), on); break; }
+      if (tries === 0 && stages === 0 && /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED/i.test(String(e.message) + " " + String(e.cause?.code ?? ""))) continue;
+      throw e;
+    }
+  }
   const text = await r.text();
   let body;
   try { body = JSON.parse(text); } catch { body = { raw: text }; }
-  const receipt = b64json(r.headers.get("x-telegraph-receipt"));
+  const receipt = b64json(r.headers.get("x-telegraph-receipt")) ?? b64json(r.headers.get("x-payment-response"));
   const cost_usd = Number(body.cost_usd ?? 0);
   // Count the worst case when a paid call fails, so the cap can only be too strict.
   spent += r.ok ? BigInt(Math.round(cost_usd * 1e6)) : r.status === 402 ? 0n : MAX_PER_REQUEST;

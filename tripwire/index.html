@@ -645,6 +645,7 @@ function chain(d, animate) {
     const row = (k, node) => { const dd = el("dd"); dd.append(node); dl.append(el("dt", k), dd); };
     if (!a.result && a.error) row("Reason", String(a.error).slice(0, 200));
     if (a.tx_hash) row("Payment", link(short(a.tx_hash), `${SCAN}/tx/${a.tx_hash}`));
+    else if (a.rail) row("Payment", "escrow rail · charged at the epoch close" + (a.epoch != null ? " · epoch " + a.epoch : ""));
     if (a.receipt_hash) row("Receipt", short(a.receipt_hash));
     if (a.signal_hash) row("Stored answer", link(short(a.signal_hash), `${NODE}/engine/v1/signal/${a.signal_hash}`));
     b.append(h, val, dl); c.append(b);

@@ -15,6 +15,8 @@ const evidence = (r) => ({
   signal_hash: r.body.signal_hash,
   receipt_hash: r.receipt?.receipt_hash,
   tx_hash: r.receipt?.tx_hash,
+  rail: r.receipt?.rail, // "escrow" settles at the epoch close, so it carries no tx hash
+  epoch: r.receipt?.epoch_id,
   cost_usd: r.cost_usd,
 });
 
