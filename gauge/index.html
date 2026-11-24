@@ -2,45 +2,106 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gauge</title>
+<title>Gauge — two sources, or an error</title>
+<meta name="description" content="A miner on the Telegraph test network that answers five questions from two keyless public sources and returns an error instead of a guess when they disagree.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='1' y='1' width='30' height='30' rx='8' fill='%23162034'/><path d='M7.5 21a8.5 8.5 0 0 1 17 0' stroke='%23aab5cb' stroke-width='2.2' fill='none' stroke-linecap='round'/><path d='M16 21l3.3-5.6' stroke='%23eef2fb' stroke-width='2' stroke-linecap='round'/><path d='M16 21l1.7-6.3' stroke='%23ffca53' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='21' r='2.2' fill='%23ffca53'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --paper: #f4f4f1; --panel: #fbfbf9; --ink: #0c0c0d; --soft: #6c6c66; --rule: #d6d6cf; --dot: #0c0c0d14; --bad: #b3261e; }
-  @media (prefers-color-scheme: dark) { :root { --paper: #0c0c0d; --panel: #141415; --ink: #f4f4f1; --soft: #96968f; --rule: #2c2c2e; --dot: #f4f4f112; --bad: #ff7b72; } }
+  :root {
+    --bg: #0c111c; --bg-soft: #101828;
+    --panel: #162034; --panel-2: #1b2745; --sunk: #0f1728;
+    --line: #2b3c60; --line-soft: #202e4d;
+    --ink: #eef2fb; --soft: #aab5cb; --faint: #8593af;
+    --amber: #ffca53; --accent: #ffca53; --on-amber: #261d03;
+    --bad: #ff6d84;
+    --glow: 0 0 18px rgba(255,202,83,.3);
+    --r: 14px; --r-s: 9px;
+    --disp: "Space Grotesk", system-ui, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+    --bg: #f6f4ee; --bg-soft: #efece3;
+    --panel: #fdfcf8; --panel-2: #f7f5ee; --sunk: #efece2;
+    --line: #d8d4c5; --line-soft: #e7e4d7;
+    --ink: #1a1f2b; --soft: #4b5365; --faint: #737b8d;
+    --amber: #ffc53d; --accent: #8a6200; --on-amber: #241b02;
+    --bad: #c22742; --glow: 0 0 14px rgba(138,98,0,.25);
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f4ee; --bg-soft: #efece3;
+    --panel: #fdfcf8; --panel-2: #f7f5ee; --sunk: #efece2;
+    --line: #d8d4c5; --line-soft: #e7e4d7;
+    --ink: #1a1f2b; --soft: #4b5365; --faint: #737b8d;
+    --amber: #ffc53d; --accent: #8a6200; --on-amber: #241b02;
+    --bad: #c22742; --glow: 0 0 14px rgba(138,98,0,.25);
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; color: var(--ink); font: 14px/1.6 "Roboto Mono", ui-monospace, Consolas, monospace; background: var(--paper) radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 24px 24px; min-height: 100vh; }
-  a { color: inherit; text-underline-offset: 3px; } :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 24px; border-bottom: 1px solid var(--rule); background: var(--paper); flex-wrap: wrap; }
-  .mark { font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-  .chip { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 3px 7px; }
-  .cap { font-size: 10px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--ink); font: 400 15px/1.7 var(--disp); min-height: 100vh;
+    background:
+      radial-gradient(1100px 520px at 85% -12%, color-mix(in srgb, var(--amber) 7%, transparent), transparent 62%),
+      linear-gradient(color-mix(in srgb, var(--line-soft) 55%, transparent) 1px, transparent 1px) 0 0 / 100% 56px,
+      linear-gradient(90deg, color-mix(in srgb, var(--line-soft) 55%, transparent) 1px, transparent 1px) 0 0 / 56px 100%,
+      var(--bg);
+    background-attachment: fixed; }
+  a { color: inherit; text-underline-offset: 3px; } :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 22px; border-bottom: 1px solid var(--line-soft);
+    background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); flex-wrap: wrap; position: sticky; top: 0; z-index: 30; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+  .mark { font: 700 14px/1 var(--disp); letter-spacing: .17em; text-transform: uppercase; }
+  .chip { font: 600 9.5px/1 var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 99px; padding: 4px 9px; }
+  .cap { font: 600 11px/1.5 var(--disp); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); }
   .grow { flex: 1; }
-  .btn { cursor: pointer; font: 500 12.5px inherit; font-family: inherit; padding: 9px 16px; border: 1px solid var(--ink); border-radius: 2px; background: var(--ink); color: var(--paper); text-decoration: none; white-space: nowrap; }
-  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); padding: 6px 11px; font-size: 12px; }
-  main { max-width: 1120px; margin: 0 auto; padding: 44px 24px 96px; }
-  h1 { font-size: clamp(30px, 5.2vw, 60px); line-height: 1.12; font-weight: 400; margin: 14px 0 22px; max-width: 18ch; }
-  h2 { font-size: 18px; font-weight: 500; margin: 0 0 12px; }
-  p.lede { max-width: 66ch; color: var(--soft); margin: 0 0 34px; }
-  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start; }
-  .box { background: var(--panel); border: 1px solid var(--rule); border-radius: 2px; padding: 20px; min-width: 0; }
-  label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: 600 13px/1 var(--disp); padding: 10px 16px;
+    border: 1px solid transparent; border-radius: var(--r-s); background: var(--amber); color: var(--on-amber); text-decoration: none;
+    white-space: nowrap; transition: filter .15s, border-color .15s, color .15s; }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); padding: 7px 12px; font-size: 12.5px; }
+  .btn.ghost:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); filter: none; color: var(--accent); }
+  main { max-width: 1140px; margin: 0 auto; padding: 44px 22px 96px; }
+  h1 { font: 500 clamp(30px, 5vw, 56px)/1.1 var(--disp); letter-spacing: -.015em; margin: 14px 0 20px; max-width: 20ch; }
+  h2 { font: 600 17.5px/1.35 var(--disp); margin: 0 0 12px; }
+  p.lede { max-width: 68ch; color: var(--soft); margin: 0 0 36px; font-size: 15px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+  .box { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line-soft); border-radius: var(--r); padding: 22px; min-width: 0; }
+  label { display: block; font: 600 12.5px/1.5 var(--disp); margin-bottom: 6px; }
   .line { display: flex; gap: 10px; align-items: end; } .line > div { flex: 1; min-width: 0; }
-  input { width: 100%; font: inherit; font-size: 13px; color: inherit; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }
-  pre { margin: 16px 0 0; padding: 12px; background: var(--paper); border: 1px solid var(--rule); font: inherit; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 120px; }
-  pre.bad { color: var(--bad); }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 34px; }
-  th { text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--soft); padding: 8px 14px 7px 0; border-bottom: 1px solid var(--ink); }
-  td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; overflow-wrap: anywhere; }
-  @media (max-width: 980px) { .cols { grid-template-columns: 1fr; } }
+  input { width: 100%; font: 400 13.5px/1.5 var(--mono); color: inherit; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: var(--r-s); background: var(--sunk); transition: border-color .15s; }
+  input:focus { outline: none; border-color: var(--accent); }
+  pre { margin: 16px 0 0; padding: 13px; background: var(--sunk); border: 1px solid var(--line-soft); border-radius: var(--r-s);
+    font: 400 12.5px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 120px; color: var(--soft); }
+  pre.ok { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  pre.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+  table { width: 100%; border-collapse: collapse; font: 400 13px/1.7 var(--mono); margin-top: 40px; }
+  th { text-align: left; font: 600 11px/1.4 var(--disp); letter-spacing: .12em; text-transform: uppercase; color: var(--soft);
+    padding: 8px 14px 7px 0; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; overflow-wrap: anywhere; }
+  td:first-child { color: var(--accent); white-space: nowrap; }
 </style>
 
 <div class="bar">
-  <span class="mark">Gauge</span><span class="chip">Miner</span><span class="cap">on Telegraph · testnet</span>
+  <a class="brand" href="https://gauge.129.121.144.223.sslip.io">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--panel-2)" stroke="var(--line)"/>
+      <path d="M7.5 21a8.5 8.5 0 0 1 17 0" stroke="var(--soft)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M16 21l3.3-5.6" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M16 21l1.7-6.3" stroke="var(--amber)" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="16" cy="21" r="2" fill="var(--amber)"/>
+    </svg>
+    <span class="mark">Gauge</span>
+  </a>
+  <span class="chip">Miner 4283</span>
+  <span class="cap" style="letter-spacing:.18em">on Telegraph · testnet</span>
   <span class="grow"></span>
   <a class="btn ghost" href="/gauge.yaml">Registration file</a>
+  <a class="btn ghost" id="home">About the project</a>
   <a class="btn ghost" id="app">Open Tripwire</a>
+  <button class="btn ghost" id="theme" aria-label="Switch between light and dark">Dark</button>
 </div>
 <main>
   <span class="cap">A data service for the Telegraph network</span>
@@ -50,7 +111,7 @@
   <div class="cols">
     <div class="box">
       <h2>Bitcoin hashprice at a block</h2>
-      <div class="line"><div><label for="b">Block height</label><input id="b" type="number" min="0" value="975340"></div><button class="btn" id="bg">Ask</button></div>
+      <div class="line"><div><label for="b">Block height</label><input id="b" type="number" inputmode="numeric" min="0" value="975340"></div><button class="btn" id="bg">Ask</button></div>
       <pre id="bo" aria-live="polite">Press Ask.</pre>
     </div>
     <div class="box">
@@ -86,14 +147,22 @@
   </table>
 </main>
 <script>
-  document.getElementById("app").href = location.protocol + "//" + location.host.replace(/^[^.]+/, "tripwire");
+  const $ = (id) => document.getElementById(id);
+  $("app").href = location.protocol + "//" + location.host.replace(/^[^.]+/, "tripwire");
+  $("home").href = location.protocol + "//" + location.host.replace(/^[^.]+/, "tripwire") + "/landing";
+  // Theme: same key and default as the app.
+  const root = document.documentElement;
+  const dark = () => (root.dataset.theme ? root.dataset.theme === "dark" : !matchMedia("(prefers-color-scheme: light)").matches);
+  const paint = () => { $("theme").textContent = dark() ? "Light" : "Dark"; };
+  try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch {}
+  $("theme").onclick = () => { root.dataset.theme = dark() ? "light" : "dark"; try { localStorage.setItem("theme", root.dataset.theme); } catch {} paint(); };
+  paint();
   const ask = (btn, out, url) => async () => {
     btn.disabled = true; out.className = ""; out.textContent = "Reading the sources…";
-    try { const r = await fetch(url()); out.className = r.ok ? "" : "bad"; out.textContent = JSON.stringify(await r.json(), null, 2); }
+    try { const r = await fetch(url()); out.className = r.ok ? "ok" : "bad"; out.textContent = JSON.stringify(await r.json(), null, 2); }
     catch (e) { out.className = "bad"; out.textContent = "The service did not answer: " + e.message; }
     btn.disabled = false;
   };
-  const $ = (id) => document.getElementById(id);
   $("bg").onclick = ask($("bg"), $("bo"), () => "/hashprice?block_height=" + encodeURIComponent($("b").value));
   $("wg").onclick = ask($("wg"), $("wo"), () => "/temperature?location=" + encodeURIComponent($("w").value));
   $("cg").onclick = ask($("cg"), $("co"), () => "/crypto-price?symbol=" + encodeURIComponent($("c").value));

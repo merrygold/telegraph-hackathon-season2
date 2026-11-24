@@ -105,8 +105,11 @@ const json = (res, code, body) => res.writeHead(code, { "Content-Type": "applica
 
 createServer(async (req, res) => {
   try {
-    if (req.method === "GET" && req.url === "/")
+    const u = new URL(req.url, "http://x"); // pathname-based so query strings (?noguide) never 404 the pages
+    if (req.method === "GET" && u.pathname === "/")
       return res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(readFileSync(here("./index.html")));
+    if (req.method === "GET" && (u.pathname === "/landing" || u.pathname === "/home")) // the project showcase page
+      return res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(readFileSync(here("./landing.html")));
     if (req.method === "GET" && req.url === "/api/state") {
       const all = readLines("./decisions.jsonl");
       return json(res, 200, {
@@ -122,7 +125,6 @@ createServer(async (req, res) => {
       const d = readLines("./decisions.jsonl").find((d) => idOf(d) === req.url.slice(14));
       return d ? json(res, 200, { ...d, id: idOf(d) }) : json(res, 404, { error: "no decision with that id" });
     }
-    const u = new URL(req.url, "http://x");
     if (req.method === "GET" && ["/api/gauge/hashprice", "/api/gauge/port-congestion", "/api/gauge/temperature", "/api/gauge/crypto-price", "/api/gauge/fx"].includes(u.pathname))
       return forward(res, GAUGE + u.pathname.slice(10) + u.search);
     if (req.method === "GET" && req.url === "/api/benchmark")

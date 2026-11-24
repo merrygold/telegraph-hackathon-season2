@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tripwire — parametric cover that buys its own proof</title>
+<meta name="description" content="An agent that settles parametric cover on the Telegraph network: reads the trigger sentence, pays one cent for the measured value, buys a second answer from a different miner, and decides with a receipt for every answer.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='1' y='1' width='30' height='30' rx='8' fill='%23162034'/><path d='M6 19h15' stroke='%23eef2fb' stroke-width='2.4' stroke-linecap='round'/><path d='M21 19c2.4 0 3.9 1.6 4.6 4.2' stroke='%23eef2fb' stroke-width='2.4' stroke-linecap='round' opacity='.4'/><path d='M21 8.5v15' stroke='%23ffca53' stroke-width='2.4' stroke-linecap='round'/><circle cx='21' cy='19' r='2.7' fill='%23ffca53'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c111c; --bg-soft: #101828;
+    --panel: #162034; --panel-2: #1b2745; --sunk: #0f1728;
+    --line: #2b3c60; --line-soft: #202e4d;
+    --ink: #eef2fb; --soft: #aab5cb; --faint: #8593af;
+    --amber: #ffca53; --accent: #ffca53; --on-amber: #261d03;
+    --pay: #45e3a2; --disputed: #ff9760; --nodata: #ff6d84; --nopay: #a5b1c6;
+    --glow: 0 0 18px rgba(255,202,83,.3);
+    --r: 16px; --r-s: 9px;
+    --disp: "Space Grotesk", system-ui, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+    --bg: #f6f4ee; --bg-soft: #efece3;
+    --panel: #fdfcf8; --panel-2: #f7f5ee; --sunk: #efece2;
+    --line: #d8d4c5; --line-soft: #e7e4d7;
+    --ink: #1a1f2b; --soft: #4b5365; --faint: #737b8d;
+    --amber: #ffc53d; --accent: #8a6200; --on-amber: #241b02;
+    --pay: #0a8752; --disputed: #b34d16; --nodata: #c22742; --nopay: #5f6a80;
+    --glow: 0 0 14px rgba(138,98,0,.25);
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f4ee; --bg-soft: #efece3;
+    --panel: #fdfcf8; --panel-2: #f7f5ee; --sunk: #efece2;
+    --line: #d8d4c5; --line-soft: #e7e4d7;
+    --ink: #1a1f2b; --soft: #4b5365; --faint: #737b8d;
+    --amber: #ffc53d; --accent: #8a6200; --on-amber: #241b02;
+    --pay: #0a8752; --disputed: #b34d16; --nodata: #c22742; --nopay: #5f6a80;
+    --glow: 0 0 14px rgba(138,98,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--bg); scroll-behavior: smooth; }
+  body { margin: 0; color: var(--ink); font: 400 15.5px/1.7 var(--disp); min-height: 100vh;
+    background:
+      radial-gradient(1100px 560px at 85% -12%, color-mix(in srgb, var(--amber) 8%, transparent), transparent 62%),
+      linear-gradient(color-mix(in srgb, var(--line-soft) 55%, transparent) 1px, transparent 1px) 0 0 / 100% 56px,
+      linear-gradient(90deg, color-mix(in srgb, var(--line-soft) 55%, transparent) 1px, transparent 1px) 0 0 / 56px 100%,
+      var(--bg);
+    background-attachment: fixed; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: color-mix(in srgb, var(--amber) 30%, transparent); }
+  .cap { font: 600 11px/1.5 var(--disp); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .grow { flex: 1; }
+
+  .top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 12px 26px;
+    border-bottom: 1px solid var(--line-soft); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+  .mark { font: 700 14px/1 var(--disp); letter-spacing: .17em; text-transform: uppercase; }
+  .chip { font: 600 9.5px/1 var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 99px; padding: 4px 9px; white-space: nowrap; }
+  .top nav { display: flex; gap: 20px; }
+  .top nav a { font: 600 13px/1 var(--disp); letter-spacing: .02em; text-decoration: none; color: var(--soft); }
+  .top nav a:hover { color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: 600 13px/1 var(--disp);
+    padding: 11px 18px; border: 1px solid transparent; border-radius: var(--r-s); background: var(--amber); color: var(--on-amber);
+    white-space: nowrap; text-decoration: none; transition: filter .15s, border-color .15s, color .15s; }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn.ghost:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); filter: none; color: var(--accent); }
+  .btn.small { padding: 8px 13px; font-size: 12.5px; }
+  @media (max-width: 880px) { .top nav { display: none; } }
+
+  main { max-width: 1140px; margin: 0 auto; padding: 0 22px; }
+  section { padding: 84px 0 8px; scroll-margin-top: 70px; }
+
+  /* ---- hero ---- */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 44px; align-items: center; padding-top: 64px; }
+  .hero h1 { font: 700 clamp(38px, 5.6vw, 68px)/1.04 var(--disp); letter-spacing: -.022em; margin: 16px 0 20px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .lede { color: var(--soft); font-size: 17px; max-width: 54ch; margin: 0 0 28px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .tiny { font: 400 13px/1.6 var(--disp); color: var(--soft); }
+  .ticker { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; padding: 9px 14px; border: 1px solid var(--line-soft);
+    border-radius: 99px; background: color-mix(in srgb, var(--panel) 80%, transparent); font: 500 12.5px/1.5 var(--mono); color: var(--soft); max-width: 100%; }
+  .ticker i { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--pay); box-shadow: 0 0 8px var(--pay); animation: blink 1.6s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+  .ticker b { color: var(--ink); font-weight: 600; }
+
+  .scene { border: 1px solid var(--line-soft); border-radius: var(--r); overflow: hidden; position: relative;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2)); box-shadow: 0 30px 70px -40px rgba(0,0,0,.6); }
+  .scene .cap { position: absolute; top: 14px; left: 16px; }
+  .scene svg { display: block; width: 100%; height: auto; }
+  .scene .wt { font: 500 11px var(--mono); fill: var(--soft); letter-spacing: .06em; }
+  .scene .wt.a { fill: var(--accent); } .scene .wt.p { fill: var(--pay); }
+  .scene .wireln { stroke: var(--ink); stroke-width: 2; fill: none; stroke-linecap: round; }
+  .scene .wireln.dead { opacity: .35; stroke-dasharray: 3 4; }
+  .scene .thrln { stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; }
+  .scene .dotc { fill: var(--amber); }
+  .scene .bursc { fill: none; stroke: var(--amber); stroke-width: 2; }
+  .scene .zone { fill: url(#hz); }
+  .scene #dot { filter: drop-shadow(0 0 7px var(--amber)); }
+  .scene .stamp rect { fill: none; stroke: var(--pay); stroke-width: 2.5; }
+  .scene .stamp text { font: 700 21px var(--mono); letter-spacing: .2em; fill: var(--pay); }
+  .scene .stamp { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pay) 45%, transparent)); }
+
+  /* ---- live strip ---- */
+  .strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line-soft); border-radius: var(--r);
+    overflow: hidden; margin-top: 54px; background: color-mix(in srgb, var(--panel) 75%, transparent); }
+  .strip > div { padding: 18px 20px; border-left: 1px solid var(--line-soft); min-width: 0; }
+  .strip > div:first-child { border-left: 0; }
+  .strip .v { font: 600 26px/1.2 var(--mono); font-variant-numeric: tabular-nums; margin-top: 4px; overflow-wrap: anywhere; }
+  .strip .v small { font-size: 13px; color: var(--soft); font-weight: 400; }
+  .strip .n { font: 400 12.5px/1.5 var(--disp); color: var(--soft); margin-top: 3px; }
+  @media (max-width: 760px) { .strip { grid-template-columns: 1fr 1fr; } .strip > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--line-soft); } .strip > div:nth-child(4) { border-top: 1px solid var(--line-soft); } }
+
+  /* ---- sections ---- */
+  h2.sec { font: 600 clamp(26px, 3.4vw, 40px)/1.12 var(--disp); letter-spacing: -.018em; margin: 12px 0 10px; max-width: 26ch; }
+  p.sec-lede { color: var(--soft); max-width: 64ch; margin: 0 0 34px; }
+
+  .steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .steps .box { border: 1px solid var(--line-soft); border-radius: var(--r); background: linear-gradient(180deg, var(--panel), var(--panel-2)); padding: 18px; min-width: 0; }
+  .steps .no { font: 600 11px/1 var(--mono); color: var(--accent); letter-spacing: .16em; }
+  .steps h3 { font: 600 16px/1.35 var(--disp); margin: 10px 0 7px; }
+  .steps p { margin: 0; font: 400 13.5px/1.6 var(--disp); color: var(--soft); }
+  .steps svg { display: block; margin-top: 2px; }
+  .steps .ic { stroke: var(--accent); stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  @media (max-width: 1000px) { .steps { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+
+  .cards6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .cov { border: 1px solid var(--line-soft); border-radius: var(--r); background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    padding: 18px; min-width: 0; transition: border-color .2s, transform .2s; }
+  .cov:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); transform: translateY(-2px); }
+  .cov header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cov .ic { stroke: var(--accent); stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .cov h3 { font: 600 16px/1.35 var(--disp); margin: 0; }
+  .cov .rule { font: 400 13.5px/1.65 var(--disp); color: var(--soft); margin: 0 0 12px; overflow-wrap: anywhere; }
+  .cov .rule b { color: var(--accent); font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
+  .cov a { font: 600 12.5px/1 var(--disp); color: var(--accent); text-decoration: none; }
+  .cov a:hover { text-decoration: underline; }
+  @media (max-width: 900px) { .cards6 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .cards6 { grid-template-columns: 1fr; } }
+
+  .entries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .ent { border: 1px solid var(--line-soft); border-radius: var(--r); background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    padding: 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .ent .role { align-self: flex-start; }
+  .ent h3 { font: 600 18px/1.3 var(--disp); margin: 4px 0 0; }
+  .ent p { margin: 0; font: 400 13.5px/1.65 var(--disp); color: var(--soft); flex: 1; }
+  .ent p b { color: var(--ink); font-weight: 600; }
+  .ent .go { font: 600 13px/1 var(--disp); color: var(--accent); text-decoration: none; }
+  .ent .go:hover { text-decoration: underline; }
+  .ent.lead { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 18%, transparent) inset; }
+  @media (max-width: 900px) { .entries { grid-template-columns: 1fr; } }
+
+  .proof { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .case { border: 1px solid var(--line-soft); border-radius: var(--r); background: linear-gradient(180deg, var(--panel), var(--panel-2)); padding: 20px; min-width: 0; }
+  .case .vs { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font: 600 22px/1.2 var(--mono); }
+  .case .vs .bad { color: var(--disputed); text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: color-mix(in srgb, var(--disputed) 55%, transparent); }
+  .case .vs .good { color: var(--pay); }
+  .case .vs .vx { font: 600 12.5px/1 var(--mono); color: var(--soft); }
+  .case p { font: 400 13.5px/1.65 var(--disp); color: var(--soft); margin: 10px 0 14px; }
+  .case a { font: 600 12.5px/1 var(--disp); color: var(--accent); text-decoration: none; }
+  .case a:hover { text-decoration: underline; }
+  @media (max-width: 900px) { .proof { grid-template-columns: 1fr; } }
+
+  .notes { border: 1px solid var(--line-soft); border-radius: var(--r); background: color-mix(in srgb, var(--sunk) 70%, transparent); padding: 6px 24px; }
+  .notes div { display: grid; grid-template-columns: 18px 1fr; gap: 12px; padding: 15px 0; border-top: 1px solid var(--line-soft); font: 400 14px/1.65 var(--disp); color: var(--soft); }
+  .notes div:first-child { border-top: 0; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  .notes i { font-style: normal; color: var(--accent); font: 600 13px/1.6 var(--mono); }
+
+  footer { margin-top: 90px; border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--sunk) 60%, transparent); }
+  .foot { max-width: 1140px; margin: 0 auto; padding: 36px 22px 44px; display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 30px; }
+  .foot h4 { font: 600 11px/1 var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--soft); margin: 0 0 14px; }
+  .foot a { display: block; font-size: 13.5px; color: var(--soft); text-decoration: none; padding: 4px 0; }
+  .foot a:hover { color: var(--accent); }
+  .foot .about-col p { font-size: 13.5px; color: var(--soft); max-width: 40ch; margin: 12px 0 0; }
+  .legal { border-top: 1px solid var(--line-soft); padding: 16px 22px 26px; display: flex; gap: 10px 22px; flex-wrap: wrap; align-items: center; max-width: 1140px; margin: 0 auto; }
+  .legal span { font: 400 12px/1.6 var(--mono); color: var(--soft); }
+  @media (max-width: 760px) { .foot { grid-template-columns: 1fr; gap: 26px; } }
+
+  /* scroll reveals: hidden states only apply when the animation stack is live (body.fx) */
+  .fx .rv { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .75s cubic-bezier(.16,1,.3,1); }
+  .fx .rv.in { opacity: 1; transform: none; }
+  .fx .rv.d1 { transition-delay: .07s; } .fx .rv.d2 { transition-delay: .14s; } .fx .rv.d3 { transition-delay: .21s; }
+  .fx .rv.d4 { transition-delay: .28s; } .fx .rv.d5 { transition-delay: .35s; }
+  @media (prefers-reduced-motion: reduce) { .fx .rv { opacity: 1; transform: none; transition: none; } .ticker i { animation: none; } html { scroll-behavior: auto; } }
+</style>
+
+<div class="top">
+  <a class="brand" href="/landing">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--panel-2)" stroke="var(--line)"/>
+      <path d="M6 19h15" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M21 19c2.4 0 3.9 1.6 4.6 4.2" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" opacity=".35" stroke-dasharray="2.6 3"/>
+      <path d="M21 8.5v15" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="21" cy="19" r="2.4" fill="var(--amber)"/>
+    </svg>
+    <span class="mark">Tripwire</span>
+  </a>
+  <span class="chip">Sepolia testnet</span>
+  <span class="grow"></span>
+  <nav aria-label="Sections">
+    <a href="#how">How it works</a>
+    <a href="#covers">Covers</a>
+    <a href="#entries">Entries</a>
+    <a href="#proof">Evidence</a>
+  </nav>
+  <a class="btn small" href="/">Open the app</a>
+  <button class="btn ghost small" id="theme" aria-label="Switch between light and dark">Dark</button>
+</div>
+
+<main>
+<div class="hero">
+  <div>
+    <span class="cap">Telegraph Hackathon · Season II · three entries, one idea</span>
+    <h1>Cover that buys its <em>own proof</em>.</h1>
+    <p class="lede">Parametric cover pays when a number crosses a line — and the weak point is whoever supplies the number. Tripwire reads the trigger sentence with fixed rules, pays one cent for the measured value on the Telegraph network, buys the same number a second time from a different miner, and only then decides: <b>PAY</b>, <b>NO_PAY</b>, <b>DISPUTED</b> or <b>NO_DATA</b> — with a receipt for every answer.</p>
+    <div class="cta">
+      <a class="btn" href="/">Open the app</a>
+      <a class="btn ghost" href="#how">See how it works</a>
+    </div>
+    <p class="tiny">Ethereum Sepolia testnet. Test USDC and test ETH — no real money moves anywhere.</p>
+    <div class="ticker" id="ticker" hidden><i></i><span>Latest decision: <b id="tk-d"></b> · <span id="tk-meta"></span></span></div>
+  </div>
+
+  <div class="scene" role="img" aria-label="A trigger value travels along a wire, crosses the amber threshold line, and the cover is stamped PAY.">
+    <span class="cap">One settlement, end to end</span>
+    <svg viewBox="0 0 560 300" aria-hidden="true">
+      <defs>
+        <pattern id="hz" width="7" height="7" patternTransform="rotate(135)" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="0" x2="0" y2="7" stroke="var(--amber)" stroke-opacity=".22" stroke-width="2"/>
+        </pattern>
+      </defs>
+      <!-- the pays zone, right of the threshold -->
+      <rect class="zone" x="430" y="168" width="96" height="44"/>
+      <!-- wire: solid to the threshold, tripped (bent, dashed) past it -->
+      <path class="wireln" d="M40 190h390"/>
+      <path class="wireln dead" d="M430 190c14 0 22 7 26 20"/>
+      <!-- threshold -->
+      <path class="thrln" d="M430 118v140"/>
+      <!-- labels -->
+      <text class="wt" x="40" y="234">trigger value · bought for $0.01</text>
+      <text class="wt" x="40" y="252">second answer · a different miner</text>
+      <text class="wt a" x="430" y="106" text-anchor="middle">threshold</text>
+      <text class="wt a" x="526" y="196" text-anchor="end">pays on this side</text>
+      <!-- the pulse -->
+      <g transform="translate(40,190)"><g id="dot"><circle class="dotc" r="6"/></g></g>
+      <!-- the crossing burst -->
+      <g transform="translate(430,190)"><g id="burst" opacity="0"><circle class="bursc" r="12"/></g></g>
+      <!-- the stamp -->
+      <g transform="translate(496,158)"><g class="stamp" id="stamp" opacity="0">
+        <rect x="-44" y="-23" width="88" height="46" rx="10"/>
+        <text x="0" y="8" text-anchor="middle">PAY</text>
+      </g></g>
+    </svg>
+  </div>
+</div>
+
+<div class="strip" id="strip">
+  <div><div class="cap">Decisions recorded</div><div class="v num" id="st-decisions">–</div><div class="n">every one with its receipts</div></div>
+  <div><div class="cap">Paid answers</div><div class="v num" id="st-answers">–</div><div class="n">bought through x402, one cent each</div></div>
+  <div><div class="cap">Spent on answers</div><div class="v num" id="st-spent">–</div><div class="n">test USDC, capped daily</div></div>
+  <div><div class="cap">Covers on file</div><div class="v num" id="st-covers">–</div><div class="n">six trigger types, all settled live</div></div>
+</div>
+
+<section id="how">
+  <span class="cap">How it works</span>
+  <h2 class="sec rv">No loss adjuster. Two purchased answers and a rule.</h2>
+  <p class="sec-lede rv">A cover is a sentence: "pays if hashprice drops under 45,000". Tripwire turns that sentence into evidence it bought itself, then applies the rule. Nothing is graded on trust and nobody is asked to believe a single feed.</p>
+  <div class="steps">
+    <div class="box rv"><span class="no">01</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" class="ic"><path d="M5 5h14M5 9h14M5 13h8"/><path d="M15 17h4" opacity=".5"/></svg>
+      <h3>Read the wording</h3><p>Fixed rules — not a model — find the number, the line and the unit, so anyone can audit what triggers a payout. Free.</p></div>
+    <div class="box rv d1"><span class="no">02</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9 9.7c0-1.2 1.3-2.2 3-2.2s3 1 3 2.2-1.2 1.8-3 2.3-3 1.1-3 2.3 1.3 2.2 3 2.2 3-1 3-2.2"/></svg>
+      <h3>Buy the number</h3><p>x402: the miner asks for payment, the agent's wallet signs, the answer returns with a receipt. About one cent.</p></div>
+    <div class="box rv d2"><span class="no">03</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" class="ic"><circle cx="7.5" cy="12" r="4.5"/><circle cx="16.5" cy="12" r="4.5"/></svg>
+      <h3>Check it twice</h3><p>If the line is crossed, the same number is bought from a second, independent miner. A miner is never asked twice.</p></div>
+    <div class="box rv d3"><span class="no">04</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" class="ic"><path d="M12 3l9 16H3z"/><path d="M12 10v4" opacity=".7"/><circle cx="12" cy="16.6" r=".4"/></svg>
+      <h3>Decide by rule</h3><p>PAY only when both agree within tolerance. Disagree, and the verdict is DISPUTED — a coin flip never moves money.</p></div>
+    <div class="box rv d4"><span class="no">05</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" class="ic"><path d="M5 4h11l3 3v13H5z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
+      <h3>Record everything</h3><p>Answers, miner names, payment transactions, a permanent link per decision. A watch loop re-checks on a timer.</p></div>
+  </div>
+</section>
+
+<section id="covers">
+  <span class="cap">Live cover types</span>
+  <h2 class="sec rv">Six lines that money can cross.</h2>
+  <p class="sec-lede rv">All six have been settled live with real paid answers on Sepolia. The first two are where the idea bites hardest — a miner's own revenue trigger, and cargo sitting at a port.</p>
+  <div class="cards6">
+    <div class="cov rv"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5"/><path d="M4 20h16"/></svg>
+      <h3>Hashprice floor</h3></header>
+      <p class="rule">Pays if hashprice at a Bitcoin block falls <b>under 45,000</b> sats per PH/s per day. The revenue line of a mining site.</p>
+      <a href="/">Settle it in the app →</a></div>
+    <div class="cov rv d1"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v10"/><path d="M6 12a6 6 0 0 0 12 0"/><path d="M9 12H5m14 0h-4"/></svg>
+      <h3>Cargo delay at a port</h3></header>
+      <p class="rule">Pays if average waiting time at the <b>Port of Helsinki</b> rises above 48 hours, measured from port calls checked against ship positions.</p>
+      <a href="/">Settle it in the app →</a></div>
+    <div class="cov rv d2"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3L7 7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></svg>
+      <h3>Heat stress on cattle</h3></header>
+      <p class="rule">Pays if the air temperature at <b>Longreach, Queensland</b> rises above 38 °C. Read from two weather services.</p>
+      <a href="/">Settle it in the app →</a></div>
+    <div class="cov rv d3"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 6.5v11M8.5 9c0-1.4 1.6-2.5 3.5-2.5s3.5 1.1 3.5 2.5-1.5 2-3.5 2.5-3.5 1.1-3.5 2.5 1.6 2.5 3.5 2.5 3.5-1.1 3.5-2.5"/></svg>
+      <h3>Any coin, any line</h3></header>
+      <p class="rule">Pays if the price of a named coin — written in plain wording — crosses the line you set. Here: <b>BTC under 60,000</b>.</p>
+      <a href="/">Settle it in the app →</a></div>
+    <div class="cov rv d4"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4.5"/><circle cx="17" cy="12" r="4.5"/><path d="M10.5 12h3" stroke-dasharray="1 2.5"/></svg>
+      <h3>Stablecoin depeg</h3></header>
+      <p class="rule">Pays if <b>USDC falls under 0.98</b> dollars — a treasury's line, checked on two exchanges before anything is paid.</p>
+      <a href="/">Settle it in the app →</a></div>
+    <div class="cov rv d5"><header>
+      <svg class="ic" width="22" height="22" viewBox="0 0 24 24"><path d="M7 8h10l-3-3M17 16H7l3 3"/></svg>
+      <h3>Dollar against the euro</h3></header>
+      <p class="rule">Pays if one US dollar buys more than <b>0.95 euros</b> — a currency move for an importer, settled on two reference feeds.</p>
+      <a href="/">Settle it in the app →</a></div>
+  </div>
+</section>
+
+<section id="entries">
+  <span class="cap">Three entries, one theme</span>
+  <h2 class="sec rv">The agent, the miner, and the referee.</h2>
+  <p class="sec-lede rv">One wallet, one network, three roles: the app that settles covers, the miner it often cross-checks with, and the evaluator that scores answers against the truth.</p>
+  <div class="entries">
+    <div class="ent lead rv">
+      <span class="chip role">App · this site</span>
+      <h3>Tripwire</h3>
+      <p>Settles parametric cover end to end. In testing it caught the network's top-routed hashprice miner <b>9.7% off</b>, a euro rate returned upside down, and two port answers <b>965 hours apart</b>. Every decision has a permanent link.</p>
+      <a class="go" href="/">Open the app →</a>
+    </div>
+    <div class="ent rv d1">
+      <span class="chip role">Miner · id 4283</span>
+      <h3>Gauge</h3>
+      <p>A registered miner that answers five questions — hashprice, port waiting time, temperature, coin price, euro rate — each from <b>two keyless public sources</b>, and returns an error instead of a guess when they disagree.</p>
+      <a class="go" href="https://gauge.129.121.144.223.sslip.io">Ask Gauge →</a>
+    </div>
+    <div class="ent rv d2">
+      <span class="chip role">Evaluator</span>
+      <h3>Tripwire Measure</h3>
+      <p>A <b>1,967-byte</b> scoring module, checked against its reference rule on 12,444 cases, plus a benchmark of real paid answers: the network's own routing picked a zero-scoring miner on 4 of 8 requests. Not live on the network yet — that rests on an open issue on their side.</p>
+      <a class="go" href="https://measure.129.121.144.223.sslip.io">Score an answer →</a>
+    </div>
+  </div>
+</section>
+
+<section id="proof">
+  <span class="cap">Caught in the wild</span>
+  <h2 class="sec rv">The network's own answers, caught by paying twice.</h2>
+  <p class="sec-lede rv">These are not simulations. Each case is a real settlement on Sepolia; open the receipt and check the payment transactions yourself.</p>
+  <div class="proof">
+    <div class="case rv">
+      <div class="vs"><span class="bad num">965.2 h</span><span class="vx">vs</span><span class="good num">0.06 h</span></div>
+      <p>Port of Helsinki, waiting time, 11 Nov 18:32 UTC. The network's routed miner said 965 hours; Gauge measured 0.06. Verdict: DISPUTED. One answer alone would have paid a 48-hour delay cover wrongly.</p>
+      <a href="https://tripwire.129.121.144.223.sslip.io/#d=d08f03f7b447" target="_blank" rel="noopener">Open that decision →</a>
+    </div>
+    <div class="case rv d1">
+      <div class="vs"><span class="bad num">46,870</span><span class="vx">vs</span><span class="good num">42,706.575</span></div>
+      <p>Hashprice at block 975340. The network's routed miner ignored the block height and answered 9.7% high; the true value is 42,706.575305. Verdict: DISPUTED — and the reason the benchmark exists.</p>
+      <a href="https://tripwire.129.121.144.223.sslip.io/#d=0ecfbc1e7371" target="_blank" rel="noopener">Open that decision →</a>
+    </div>
+    <div class="case rv d2">
+      <div class="vs"><span class="bad num">1.1127</span><span class="vx">vs</span><span class="good num">0.8987</span></div>
+      <p>The euro rate, upside down. A miner returned 1.1127 — dollars per euro — where the intent asks for euros per dollar. Bought, recorded, and refused. The ledger holds the receipt.</p>
+      <a href="/">See the ledger in the app →</a>
+    </div>
+  </div>
+</section>
+
+<section id="notes">
+  <span class="cap">Read the fine print</span>
+  <h2 class="sec rv">What this is, plainly.</h2>
+  <p class="sec-lede rv">Everything here is honest about its limits. The short version:</p>
+  <div class="notes">
+    <div class="rv"><i>※</i><span><b>Testnet only.</b> Ethereum Sepolia, test USDC and test ETH. No real money moves anywhere, and the app never asks you to connect a wallet.</span></div>
+    <div class="rv"><i>※</i><span><b>One shared wallet, disclosed.</b> The app pays from and Gauge is paid into the same test wallet, so the second answer often comes from our own miner. The first answer always comes from another operator's miner.</span></div>
+    <div class="rv"><i>※</i><span><b>The evaluator is not live on the network.</b> The node currently classes this question family as judgment (open issue #171 on their side). The entry rests on the 12,444-case check, the benchmark and an uploaded, admitted truth source.</span></div>
+    <div class="rv"><i>※</i><span><b>Port cover is Finnish ports only.</b> Fintraffic is the one free feed with both port calls and ship positions. Gauge says so plainly when asked about Rotterdam.</span></div>
+    <div class="rv"><i>※</i><span><b>Weather cover is not new.</b> Three Season I entries built it. The range of triggers, the plain-wording reader and the bought-twice habit are the point here.</span></div>
+    <div class="rv"><i>※</i><span><b>The payout is a plain transfer.</b> A cover on file can carry a small test-USDC payout — capped, once per cover, only when both miners agree. It is not an escrow contract.</span></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="foot">
+    <div class="about-col">
+      <a class="brand" href="/landing">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--panel-2)" stroke="var(--line)"/>
+          <path d="M6 19h15" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M21 19c2.4 0 3.9 1.6 4.6 4.2" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" opacity=".35" stroke-dasharray="2.6 3"/>
+          <path d="M21 8.5v15" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="21" cy="19" r="2.4" fill="var(--amber)"/>
+        </svg>
+        <span class="mark">Tripwire</span>
+      </a>
+      <p>An agent that settles parametric cover by buying the trigger value twice before it pays. Built for the Telegraph Hackathon, Season II.</p>
+    </div>
+    <div>
+      <h4>The three entries</h4>
+      <a href="/">Tripwire · app</a>
+      <a href="https://gauge.129.121.144.223.sslip.io">Gauge · miner</a>
+      <a href="https://measure.129.121.144.223.sslip.io">Tripwire Measure · evaluator</a>
+    </div>
+    <div>
+      <h4>Elsewhere</h4>
+      <a href="https://github.com/merrygold/telegraph-hackathon-season2" target="_blank" rel="noopener">Source on GitHub</a>
+      <a href="https://sepolia.etherscan.io/address/0x5a7457D50a0bC554d83c810DeA7394cA62411880" target="_blank" rel="noopener">The agent's wallet on Etherscan</a>
+      <a href="https://devnode.telegraphprotocol.com" target="_blank" rel="noopener">Telegraph test node</a>
+    </div>
+  </div>
+  <div class="legal">
+    <span>Ethereum Sepolia testnet · test tokens only · not insurance</span>
+    <span class="grow"></span>
+    <span>Deadline 1 Dec 2026, 23:59 UTC</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/animejs@4.2.2/dist/bundles/anime.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/motion@12.23.24/dist/motion.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+const WORDS = { PAY: "Pay", NO_PAY: "No payout", DISPUTED: "Disputed", NO_DATA: "No data" };
+
+// Theme: same key and default as the app.
+const root = document.documentElement;
+const dark = () => (root.dataset.theme ? root.dataset.theme === "dark" : !matchMedia("(prefers-color-scheme: light)").matches);
+const paint = () => { $("theme").textContent = dark() ? "Light" : "Dark"; };
+try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch {}
+$("theme").onclick = () => { root.dataset.theme = dark() ? "light" : "dark"; try { localStorage.setItem("theme", root.dataset.theme); } catch {} paint(); };
+paint();
+
+// Animation is an extra: the page reads the same if the libraries fail to load.
+const A = window.anime, M = window.Motion;
+const calm = !A || !M || matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!calm) document.body.classList.add("fx");
+
+// Hero loop: the pulse travels the wire, trips the threshold, the verdict stamps down.
+function heroLoop() {
+  if (calm) { $("dot").setAttribute("transform", "translate(390,0)"); $("stamp").setAttribute("opacity", "1"); $("burst").setAttribute("opacity", "0"); return; }
+  const run = () => {
+    A.animate($("burst"), { opacity: [0, 0], scale: [0.2, 0.2], duration: 1 });
+    A.animate($("dot"), { translateX: [0, 390], duration: 1900, ease: "inOut(2)", onComplete: () => {
+      A.animate($("burst"), { opacity: [0.9, 0], scale: [0.3, 3], duration: 750, ease: "out(3)" });
+      A.animate($("stamp"), { opacity: [0, 1], scale: [1.8, 1], rotate: [-10, -4], duration: 480, ease: "out(4)", onComplete: () => {
+        setTimeout(() => A.animate($("stamp"), { opacity: 0, duration: 450, onComplete: () => {
+          A.animate($("dot"), { translateX: 0, duration: 1, onComplete: () => setTimeout(run, 500) });
+        } }), 1400);
+      } });
+    } });
+  };
+  setTimeout(run, 700);
+}
+heroLoop();
+
+// Scroll reveals, only when the animation stack is live. The 5-second sweep is a failsafe:
+// if inView never fires (old library, odd embed), every section still becomes visible.
+if (!calm && M.inView) {
+  M.inView(".rv", (entry) => { (entry.target ?? entry).classList.add("in"); }, { margin: "-8% 0px -8% 0px" });
+  setTimeout(() => document.querySelectorAll(".rv:not(.in)").forEach((n) => n.classList.add("in")), 5000);
+}
+
+// Live totals from the app's own API; the strip reads "–" until this lands.
+const setNum = (id, v, digits = 0) => {
+  const node = $(id);
+  const show = (x) => { node.textContent = x.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }); };
+  if (calm || !Number.isFinite(v)) return show(v);
+  const o = { v: 0 }; show(0);
+  A.animate(o, { v, duration: 1100, ease: "outExpo", onUpdate: () => show(o.v), onComplete: () => show(v) });
+};
+(async () => {
+  try {
+    const r = await fetch("/api/state");
+    const s = await r.json();
+    const t = s.totals;
+    setNum("st-decisions", t.decisions);
+    setNum("st-answers", t.paid_requests);
+    setNum("st-spent", t.spent_usd, 2);
+    setNum("st-covers", s.covers.length);
+    const d = s.decisions?.[0]; // newest first
+    if (d) {
+      $("tk-d").textContent = WORDS[d.decision] ?? d.decision;
+      $("tk-meta").textContent = `${d.cover.split(":")[0]} · ${new Date(d.at).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+      $("ticker").hidden = false;
+    }
+  } catch {
+    document.querySelectorAll("#strip .v").forEach((n) => (n.textContent = "live"));
+    document.querySelector("#strip .cap") && ($("strip").style.opacity = ".75");
+  }
+})();
+</script>
+</html>
