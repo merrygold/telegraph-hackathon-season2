@@ -155,3 +155,14 @@ By default the second answer is bought only on a breach, so the rule guards agai
 
 - Set `primary` to a miner you have checked against the source yourself, as `hashprice-txlens.json` does.
 - Fix the supply side: a miner that answers for the block asked (see `gauge/`), and evaluation that scores the wrong one down (see `measure/`).
+
+## Paying from escrow (and the gotcha the docs hide)
+
+In November 2026 the devnode stopped quoting `exact` on Ethereum Sepolia for the ask endpoints. Its 402 now offers three rails: `exact` on Base Sepolia, `exact` on Solana, and Telegraph's own `escrow` scheme on Sepolia. A client that only registered the old rail dies with `No network/scheme registered` before signing anything. Escrow is the documented replacement: deposit once with `LedgerFacet.depositUSDC(amount)` into the node's Diamond, then every request carries a `personal_sign` (EIP-191) signature over the node's message template instead of a per-request payment - no facilitator round trip, no on-chain settlement, and the charge lands in the epoch's ledger root. The receipt comes back in `X-PAYMENT-RESPONSE` and has **no `tx_hash`**: `rail: "escrow"`, an `epoch_id`, and a `receipt_hash` you can later prove against `GET /v1/blocks/{epochId}/deliveries/{receiptHash}`.
+
+Two details cost us an afternoon:
+
+- The docs tell you to lowercase the wallet **in the signed message**, and that is right: the node lowercases before verifying. What they do not say is that the payload's `authorization.from` field should stay **checksummed**. With a lowercase `from` there the signature still verifies but the node's balance lookup misses - you get `insufficient escrow for delivery ... balance=0` against a funded account. Same bytes signed, different string looked up.
+- Right after you deposit, the ask path can read a stale balance (the account endpoint and the chain already show the money). Wait a few minutes before concluding anything.
+
+The whole rail is: read the 402, find `accepts[]` with `scheme: "escrow"`, fill `{from}` (lowercase), `{nonce}` (fresh - nonces are remembered until the authorization expires), `{validAfter}` and `{validBefore}` (window under 2 minutes) into `extra.message` **without rewording it**, sign it, and send base64 `{x402Version: 2, scheme: "escrow", network, payload: { signature, authorization }}` in `X-PAYMENT`. Working code, with the funding script and a test for the template builder: `tripwire/telegraph.mjs`, `tripwire/escrow.mjs`, `tripwire/telegraph.test.mjs`.
